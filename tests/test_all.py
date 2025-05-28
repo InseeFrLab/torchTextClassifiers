@@ -7,9 +7,9 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 
-from torchFastText import torchFastText
-from torchFastText.preprocess import clean_text_feature
-from torchFastText.datasets import NGramTokenizer
+from torchTextClassifiers import torchTextClassifiers
+from torchTextClassifiers.preprocess import clean_text_feature
+from torchTextClassifiers.datasets import NGramTokenizer
 
 source_path = Path(__file__).resolve()
 source_dir = source_path.parent
@@ -111,7 +111,7 @@ def test_building(data):
     for vocab, cat_embedding_dim, num_cat in product(
         vocab_possible_values, cat_embedding_dim_possible_values, num_cat_possible_values
     ):
-        model = torchFastText(
+        model = torchTextClassifiers(
             num_tokens=num_tokens,
             num_rows=num_tokens,
             embedding_dim=embedding_dim,
@@ -152,7 +152,7 @@ def test_training(data):
         vocab_possible_values, cat_embedding_dim_possible_values, num_cat_possible_values
     ):
         print(vocab, cat_embedding_dim, num_cat)
-        model = torchFastText(
+        model = torchTextClassifiers(
             num_tokens=num_tokens,
             embedding_dim=embedding_dim,
             min_count=min_count,

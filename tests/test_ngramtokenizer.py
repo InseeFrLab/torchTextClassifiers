@@ -1,5 +1,5 @@
 import pytest
-from torchFastText.datasets.tokenizer import NGramTokenizer
+from torchTextClassifiers.datasets.tokenizer import NGramTokenizer
 
 
 def test_ngramtokenizer_init_valid():

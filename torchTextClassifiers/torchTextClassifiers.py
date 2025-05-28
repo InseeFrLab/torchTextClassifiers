@@ -31,7 +31,7 @@ logging.basicConfig(
 
 
 @dataclass
-class torchFastText:
+class torchTextClassifiers:
     """
     The main class for the torchFastText model.
 
@@ -189,7 +189,7 @@ class torchFastText:
 
     @classmethod
     def build_from_tokenizer(
-        cls: Type["torchFastText"],
+        cls: Type["torchTextClassifiers"],
         tokenizer: NGramTokenizer,
         embedding_dim: int,
         num_classes: Optional[int],
@@ -205,7 +205,7 @@ class torchFastText:
         scheduler_params: Optional[dict] = None,
         patience_scheduler=3,
         loss=torch.nn.CrossEntropyLoss(),
-    ) -> "torchFastText":
+    ) -> "torchTextClassifiers":
         """
         Alternative constructor that initializes torchFastText from a tokenizer.
         Directly builds the PyTorch model and Lightning module (if lightning == True).
@@ -796,7 +796,7 @@ class torchFastText:
             json.dump(data, f, cls=NumpyJSONEncoder, indent=4)
 
     @classmethod
-    def from_json(cls: Type["torchFastText"], filepath: str) -> "torchFastText":
+    def from_json(cls: Type["torchTextClassifiers"], filepath: str) -> "torchTextClassifiers":
         """
         Load a dataclass instance from a JSON file.
         """

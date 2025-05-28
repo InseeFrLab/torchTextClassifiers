@@ -1,6 +1,6 @@
 import pytest
-from torchFastText.datasets.dataset import FastTextModelDataset
-from torchFastText.datasets.tokenizer import NGramTokenizer
+from torchTextClassifiers.datasets.dataset import FastTextModelDataset
+from torchTextClassifiers.datasets.tokenizer import NGramTokenizer
 
 
 @pytest.fixture

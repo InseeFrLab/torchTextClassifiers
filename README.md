@@ -1,6 +1,6 @@
-# torchFastText : Efficient text classification with PyTorch
+# torchTextClassifiers : Efficient text classification with PyTorch
 
-A flexible PyTorch implementation of FastText for text classification with support for categorical features.
+A flexible PyTorch implementation of models for text classification with support for categorical features.
 
 ## Features
 
@@ -14,8 +14,17 @@ A flexible PyTorch implementation of FastText for text classification with suppo
 
 ## Installation
 
+- With `pip`:
+
 ```bash
-pip install torchFastText
+pip install torchTextClassifiers
+```
+
+- with `uv`:
+
+
+```bash
+uv add torchTextClassifiers
 ```
 
 ## Key Components
@@ -30,16 +39,16 @@ pip install torchFastText
 - `preprocess`: To preprocess text input, using `nltk` and `unidecode` libraries.
 - `explainability`: Simple methods to visualize feature attributions at word and letter levels, using `captum`library.
 
-Run `pip install torchFastText[preprocess]` or `pip install torchFastText[explainability]` to download these optional dependencies.
+Run `pip install torchTextClassifiers[preprocess]` or `pip install torchTextClassifiers[explainability]` to download these optional dependencies.
 
 
 ## Quick Start
 
 ```python
-from torchFastText import torchFastText
+from torchTextClassifiers import torchTextClassifiers
 
 # Initialize the model
-model = torchFastText(
+model = torchTextclassifiers(
     num_tokens=1000000,
     embedding_dim=100,
     min_count=5,

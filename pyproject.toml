@@ -1,5 +1,5 @@
 [project]
-name = "torchFastText"
+name = "torchtextclassifiers"
 description = "An implementation of the https://github.com/facebookresearch/fastText supervised learning algorithm for text classification using Pytorch."
 authors = [
     { name = "Tom Seimandi", email = "tom.seimandi@gmail.com" },
@@ -8,7 +8,7 @@ authors = [
     { name = "Cédric Couralet", email = "cedric.couralet@insee.fr" },
 ]
 readme = "README.md"
-repository = "https://github.com/InseeFrLab/torch-fastText"
+repository = "https://github.com/InseeFrLab/torchTextClassifiers"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
@@ -19,29 +19,35 @@ dependencies = [
     "numpy>=1.26.4",
     "pytorch-lightning>=2.4.0"
 ]
-requires-python = ">=3.10"
-dynamic = ["version"]
+requires-python = ">=3.11"
+version="0.0.0-dev"
 
+
+[dependency-groups]
+dev = [
+  "pytest >=8.1.1,<9",
+  "pandas",
+  "scikit-learn",
+  "nltk",
+  "unidecode",
+  "captum"
+]
 
 [project.optional-dependencies]
 explainability = ["unidecode", "nltk", "captum"]
 preprocess =     ["unidecode", "nltk"]
 
 [build-system]
-requires = ["poetry-core>=2.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["uv_build>=0.7.8,<0.8.0"]
+build-backend = "uv_build"
 
 [tool.ruff]
 line-length = 100
 
-[tool.poetry]
-version = "0.0.1-dev"  # base version
-packages = [{include = "torchFastText"}]
 
-[tool.poetry.requires-plugins]
-poetry-dynamic-versioning = { version = ">=1.0.0,<2.0.0", extras = ["plugin"] }
+[tool.uv.build-backend]
+module-name="torchTextClassifiers"
+module-root = ""
 
-[tool.poetry-dynamic-versioning]
-enable = true
-vcs = "git"
-style = "semver"
+
+
