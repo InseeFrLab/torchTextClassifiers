@@ -9,7 +9,7 @@ from difflib import SequenceMatcher
 import torch
 import torch.nn.functional as F
 
-from ..preprocess import clean_text_feature
+from .preprocess import clean_text_feature
 
 
 def preprocess_token(token):
