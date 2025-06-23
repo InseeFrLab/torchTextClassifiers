@@ -1,9 +1,7 @@
 from ..base import BaseClassifierWrapper
-from .config import FastTextConfig
+from .core import FastTextConfig
 from .tokenizer import NGramTokenizer
-from .pytorch_model import FastTextModel
-from .lightning_module import FastTextModule
-from .dataset import FastTextModelDataset
+from .model import FastTextModel, FastTextModule, FastTextModelDataset
 from ...utilities.checkers import check_X, check_Y
 import logging
 import numpy as np
@@ -129,35 +127,36 @@ class FastTextWrapper(BaseClassifierWrapper):
         else:
             assert self.pytorch_model.no_cat_var == True
         
-        return self.pytorch_model.predict(
+        predictions, confidence = self.pytorch_model.predict(
             text, categorical_variables, top_k=top_k, preprocess=preprocess
         )
+        
+        # Return just predictions, squeeze out the top_k dimension if top_k=1
+        if top_k == 1:
+            predictions = predictions.squeeze(-1)
+        
+        # Convert to numpy array for consistency
+        if hasattr(predictions, 'numpy'):
+            predictions = predictions.numpy()
+            
+        return predictions
     
     def validate(self, X: np.ndarray, Y: np.ndarray, batch_size=256, num_workers=12) -> float:
         """Validate FastText model."""
         if not self.trained:
             raise Exception("Model must be trained first.")
         
-        text, categorical_variables, no_cat_var = check_X(X)
+        # Use predict method which handles input validation and returns just predictions
+        predictions = self.predict(X)
         y = check_Y(Y)
         
-        if categorical_variables is not None:
-            if categorical_variables.shape[1] != self.config.num_categorical_features:
-                raise Exception(
-                    f"X must have the same number of categorical variables as training data ({self.config.num_categorical_features})"
-                )
-        else:
-            assert self.pytorch_model.no_cat_var == True
+        # Convert predictions to numpy if it's a tensor
+        if hasattr(predictions, 'numpy'):
+            predictions = predictions.numpy()
         
-        dataset = FastTextModelDataset(
-            categorical_variables=categorical_variables,
-            texts=text,
-            outputs=y,
-            tokenizer=self.tokenizer,
-        )
-        dataloader = dataset.create_dataloader(batch_size=batch_size, num_workers=num_workers)
-        
-        return self.trainer.test(self.pytorch_model, test_dataloaders=dataloader, verbose=False)
+        # Calculate accuracy
+        accuracy = (predictions == y).mean()
+        return float(accuracy)
     
     def predict_and_explain(self, X: np.ndarray, top_k=1):
         """Predict and explain with FastText model."""

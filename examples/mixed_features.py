@@ -15,7 +15,7 @@ def main():
     # Create sample data with text + categorical features
     print("📝 Creating mixed feature data...")
     
-    # Text reviews
+    # Text reviews - expanded dataset
     reviews = np.array([
         "Great product, fast delivery!",
         "Poor quality, disappointing purchase.",
@@ -26,7 +26,47 @@ def main():
         "Perfect fit, great design!",
         "Defective item, had to return.",
         "Outstanding quality and service.",
-        "Overpriced for what you get."
+        "Overpriced for what you get.",
+        "Superb craftsmanship and attention to detail.",
+        "Cheaply made, broke after one week of use.",
+        "Exactly what I needed, fits perfectly.",
+        "Arrived damaged and customer service was unhelpful.",
+        "Best purchase I've made this year!",
+        "Waste of money, completely useless product.",
+        "Impressive build quality and modern design.",
+        "False advertising, nothing like the pictures.",
+        "Works flawlessly, exceeded my expectations.",
+        "Returned it immediately, complete garbage.",
+        "Beautiful packaging and premium feel.",
+        "Cheap plastic construction, very flimsy.",
+        "Fast shipping and excellent communication.",
+        "Seller was rude and unresponsive to questions.",
+        "Highly durable and well-engineered product.",
+        "Broke on first use, total manufacturing defect.",
+        "Stylish appearance and great functionality.",
+        "Misleading description, not as advertised.",
+        "Professional quality at reasonable price.",
+        "Overpriced junk, save your money elsewhere.",
+        "Innovative features and user-friendly design.",
+        "Outdated technology, better alternatives available.",
+        "Prompt delivery and secure packaging.",
+        "Took forever to arrive and was poorly packed.",
+        "Premium materials and exceptional workmanship.",
+        "Feels cheap and looks even worse in person.",
+        "Versatile product with many useful applications.",
+        "Limited functionality, not worth the investment.",
+        "Reliable performance and consistent quality.",
+        "Constant malfunctions and technical issues.",
+        "Elegant design that complements any space.",
+        "Ugly appearance and doesn't match the photos.",
+        "Easy to use with clear instructions included.",
+        "Confusing setup process and poor documentation.",
+        "Great customer support and hassle-free returns.",
+        "Terrible warranty service and unhelpful staff.",
+        "Compact size perfect for small spaces.",
+        "Too bulky and takes up unnecessary room.",
+        "Energy efficient and environmentally friendly.",
+        "Power hungry device that increases electricity bills."
     ])
     
     # Categorical features: [product_category, price_range, brand_tier]
@@ -44,39 +84,143 @@ def main():
         [1, 0, 0],  # Clothing, Budget, Generic brand
         [2, 2, 2],  # Home, Premium, Premium brand
         [0, 2, 1],  # Electronics, Premium, Known brand
+        [2, 2, 2],  # Home, Premium, Premium brand
+        [1, 0, 0],  # Clothing, Budget, Generic brand
+        [0, 1, 1],  # Electronics, Mid-range, Known brand
+        [2, 0, 0],  # Home, Budget, Generic brand
+        [1, 2, 2],  # Clothing, Premium, Premium brand
+        [0, 0, 0],  # Electronics, Budget, Generic brand
+        [2, 1, 1],  # Home, Mid-range, Known brand
+        [1, 0, 0],  # Clothing, Budget, Generic brand
+        [0, 2, 2],  # Electronics, Premium, Premium brand
+        [2, 0, 0],  # Home, Budget, Generic brand
+        [1, 2, 2],  # Clothing, Premium, Premium brand
+        [0, 0, 0],  # Electronics, Budget, Generic brand
+        [2, 1, 1],  # Home, Mid-range, Known brand
+        [1, 0, 0],  # Clothing, Budget, Generic brand
+        [0, 2, 2],  # Electronics, Premium, Premium brand
+        [2, 1, 0],  # Home, Mid-range, Generic brand
+        [1, 1, 1],  # Clothing, Mid-range, Known brand
+        [0, 0, 0],  # Electronics, Budget, Generic brand
+        [2, 2, 2],  # Home, Premium, Premium brand
+        [1, 0, 0],  # Clothing, Budget, Generic brand
+        [0, 2, 2],  # Electronics, Premium, Premium brand
+        [2, 1, 1],  # Home, Mid-range, Known brand
+        [1, 1, 1],  # Clothing, Mid-range, Known brand
+        [0, 0, 0],  # Electronics, Budget, Generic brand
+        [2, 2, 2],  # Home, Premium, Premium brand
+        [1, 0, 0],  # Clothing, Budget, Generic brand
+        [0, 1, 1],  # Electronics, Mid-range, Known brand
+        [2, 0, 0],  # Home, Budget, Generic brand
+        [1, 2, 2],  # Clothing, Premium, Premium brand
+        [0, 1, 0],  # Electronics, Mid-range, Generic brand
+        [2, 2, 2],  # Home, Premium, Premium brand
+        [1, 0, 0],  # Clothing, Budget, Generic brand
+        [0, 1, 1],  # Electronics, Mid-range, Known brand
+        [2, 0, 0],  # Home, Budget, Generic brand
+        [1, 2, 2],  # Clothing, Premium, Premium brand
+        [0, 0, 0],  # Electronics, Budget, Generic brand
+        [2, 1, 1],  # Home, Mid-range, Known brand
+        [1, 1, 0],  # Clothing, Mid-range, Generic brand
+        [0, 2, 2],  # Electronics, Premium, Premium brand
+        [2, 0, 0],  # Home, Budget, Generic brand
     ])
     
     # Combine text and categorical features
     X_train = np.column_stack([reviews, categorical_features])
     
     # Labels: 1=positive review, 0=negative review
-    y_train = np.array([1, 0, 1, 0, 1, 0, 1, 0, 1, 0])
+    y_train = np.array([1, 0, 1, 0, 1, 0, 1, 0, 1, 0,  # First 10 (original)
+                        1, 0, 1, 0, 1, 0, 1, 0, 1, 0,  # 11-20
+                        1, 0, 1, 0, 1, 0, 1, 0, 1, 0,  # 21-30
+                        1, 0, 1, 0, 1, 0, 1, 0, 1, 0,  # 31-40
+                        1, 0, 1, 0, 1, 0, 1, 0, 1, 0]) # 41-50
     
-    # Validation data
+    # Validation data - expanded
     val_reviews = np.array([
         "Good product, satisfied with purchase.",
-        "Not impressed, poor value for money."
+        "Not impressed, poor value for money.",
+        "Exceptional quality and fast shipping.",
+        "Defective product, poor manufacturing.",
+        "Love the design and functionality.",
+        "Completely useless, waste of money.",
+        "Sturdy construction and reliable performance.",
+        "Cheap materials, broke after few days.",
+        "Perfect size and excellent features.",
+        "Overpriced and underwhelming quality.",
+        "Great customer service and support.",
+        "Terrible experience, would not recommend.",
+        "High-quality materials and craftsmanship.",
+        "Poor durability, not worth the price.",
+        "Sleek design and intuitive interface."
     ])
     val_categorical = np.array([
         [1, 1, 1],  # Clothing, Mid-range, Known brand
-        [2, 0, 0]   # Home, Budget, Generic brand
+        [2, 0, 0],  # Home, Budget, Generic brand
+        [0, 2, 2],  # Electronics, Premium, Premium brand
+        [1, 0, 0],  # Clothing, Budget, Generic brand
+        [2, 1, 1],  # Home, Mid-range, Known brand
+        [0, 0, 0],  # Electronics, Budget, Generic brand
+        [1, 2, 2],  # Clothing, Premium, Premium brand
+        [2, 0, 0],  # Home, Budget, Generic brand
+        [0, 1, 1],  # Electronics, Mid-range, Known brand
+        [1, 1, 0],  # Clothing, Mid-range, Generic brand
+        [2, 2, 2],  # Home, Premium, Premium brand
+        [0, 0, 0],  # Electronics, Budget, Generic brand
+        [1, 2, 2],  # Clothing, Premium, Premium brand
+        [2, 0, 0],  # Home, Budget, Generic brand
+        [0, 1, 1]   # Electronics, Mid-range, Known brand
     ])
     X_val = np.column_stack([val_reviews, val_categorical])
-    y_val = np.array([1, 0])
+    y_val = np.array([1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1])
     
-    # Test data
+    # Test data - expanded
     test_reviews = np.array([
         "Fantastic product with excellent features!",
         "Complete waste of money, very poor quality.",
-        "Great value and wonderful customer service."
+        "Great value and wonderful customer service.",
+        "Outstanding build quality and durability.",
+        "Flimsy construction, broke immediately.",
+        "Impressive performance and reliability.",
+        "Disappointing purchase, not recommended.",
+        "Beautiful design and premium materials.",
+        "Cheap knock-off, avoid at all costs.",
+        "Exceeded expectations in every way.",
+        "Faulty product with numerous defects.",
+        "Highly recommended for its quality.",
+        "Poorly designed and difficult to use.",
+        "Excellent investment, worth every penny.",
+        "Regret buying this inferior product.",
+        "Innovative solution to common problems.",
+        "Outdated design with limited features.",
+        "Reliable and efficient performance.",
+        "Constant issues and poor reliability.",
+        "Perfect addition to any collection."
     ])
     test_categorical = np.array([
         [0, 2, 2],  # Electronics, Premium, Premium brand
         [1, 0, 0],  # Clothing, Budget, Generic brand  
-        [2, 1, 1]   # Home, Mid-range, Known brand
+        [2, 1, 1],  # Home, Mid-range, Known brand
+        [0, 1, 1],  # Electronics, Mid-range, Known brand
+        [1, 0, 0],  # Clothing, Budget, Generic brand
+        [2, 2, 2],  # Home, Premium, Premium brand
+        [0, 0, 0],  # Electronics, Budget, Generic brand
+        [1, 2, 2],  # Clothing, Premium, Premium brand
+        [2, 0, 0],  # Home, Budget, Generic brand
+        [0, 2, 2],  # Electronics, Premium, Premium brand
+        [1, 1, 0],  # Clothing, Mid-range, Generic brand
+        [2, 1, 1],  # Home, Mid-range, Known brand
+        [0, 0, 0],  # Electronics, Budget, Generic brand
+        [1, 2, 2],  # Clothing, Premium, Premium brand
+        [2, 0, 0],  # Home, Budget, Generic brand
+        [0, 1, 1],  # Electronics, Mid-range, Known brand
+        [1, 0, 0],  # Clothing, Budget, Generic brand
+        [2, 2, 2],  # Home, Premium, Premium brand
+        [0, 1, 0],  # Electronics, Mid-range, Generic brand
+        [1, 1, 1]   # Clothing, Mid-range, Known brand
     ])
     X_test = np.column_stack([test_reviews, test_categorical])
-    y_test = np.array([1, 0, 1])
+    y_test = np.array([1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1])
     
     print(f"Training samples: {len(X_train)}")
     print(f"Feature dimensions: Text + {categorical_features.shape[1]} categorical features")

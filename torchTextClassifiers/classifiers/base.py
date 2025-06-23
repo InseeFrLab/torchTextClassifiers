@@ -2,7 +2,6 @@ from typing import Optional, Union, Type, List, Dict, Any
 from dataclasses import dataclass, field, asdict
 from abc import ABC, abstractmethod
 import numpy as np
-from .fasttext.tokenizer import NGramTokenizer
 
 class BaseClassifierConfig(ABC):
     """Abstract base class for classifier configurations."""
@@ -23,7 +22,7 @@ class BaseClassifierWrapper(ABC):
     
     def __init__(self, config: BaseClassifierConfig):
         self.config = config
-        self.tokenizer: Optional[NGramTokenizer] = None
+        self.tokenizer: Optional[Any] = None
         self.pytorch_model = None
         self.lightning_module = None
         self.trained: bool = False

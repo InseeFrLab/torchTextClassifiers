@@ -105,7 +105,7 @@ def test_numpy_json_encoder():
 
 def test_create_fasttext_classmethod():
     """Test the create_fasttext class method through FastTextFactory."""
-    from torchTextClassifiers.classifiers.fasttext.factory import FastTextFactory
+    from torchTextClassifiers.classifiers.fasttext.core import FastTextFactory
     from torchTextClassifiers.torchTextClassifiers import torchTextClassifiers, ClassifierType
     
     # Just test that it creates a real instance and config properly

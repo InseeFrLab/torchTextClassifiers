@@ -50,7 +50,7 @@ def sample_X_text_only(sample_text_data):
 @pytest.fixture
 def fasttext_config():
     """Mock FastText configuration."""
-    from torchTextClassifiers.classifiers.fasttext.config import FastTextConfig
+    from torchTextClassifiers.classifiers.fasttext.core import FastTextConfig
     
     config = FastTextConfig(
         embedding_dim=10,

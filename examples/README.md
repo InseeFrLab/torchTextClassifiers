@@ -81,6 +81,28 @@ uv run python advanced_training.py
 - Training parameter tuning
 - Model performance comparison
 
+### 5. [MLflow Integration](mlflow_integration.py)
+Demonstrates MLflow integration for experiment tracking and model management:
+- Training and logging models to MLflow
+- Experiment tracking with metrics and parameters
+- Model versioning and registry
+- Loading models from MLflow for inference
+- Model artifact management
+
+**Run the example:**
+```bash
+cd examples
+pip install mlflow  # Install MLflow first
+uv run python mlflow_integration.py
+```
+
+**What you'll learn:**
+- MLflow experiment tracking setup
+- Model logging and versioning
+- Loading models for inference
+- Model registry management
+- Reproducible ML workflows
+
 ## 🚀 Quick Start
 
 To run any example:

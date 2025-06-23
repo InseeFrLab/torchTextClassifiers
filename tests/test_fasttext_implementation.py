@@ -4,11 +4,9 @@ import torch
 from unittest.mock import Mock, patch, MagicMock
 
 from torchTextClassifiers.classifiers.fasttext.wrapper import FastTextWrapper
-from torchTextClassifiers.classifiers.fasttext.config import FastTextConfig
+from torchTextClassifiers.classifiers.fasttext.core import FastTextConfig
 from torchTextClassifiers.classifiers.fasttext.tokenizer import NGramTokenizer
-from torchTextClassifiers.classifiers.fasttext.dataset import FastTextModelDataset
-from torchTextClassifiers.classifiers.fasttext.pytorch_model import FastTextModel
-from torchTextClassifiers.classifiers.fasttext.lightning_module import FastTextModule
+from torchTextClassifiers.classifiers.fasttext.model import FastTextModelDataset, FastTextModel, FastTextModule
 
 
 class TestFastTextConfig:
@@ -184,8 +182,9 @@ class TestFastTextWrapper:
     def test_predict_success(self, mock_check_X, fasttext_config, sample_text_data, mock_pytorch_model):
         """Test successful prediction."""
         mock_check_X.return_value = (sample_text_data, None, True)
-        expected_predictions = np.array([1, 0, 1])
-        mock_pytorch_model.predict.return_value = expected_predictions
+        expected_predictions = np.array([[1], [0], [1]])  # With top_k dimension
+        expected_confidence = np.array([[0.9], [0.8], [0.95]])
+        mock_pytorch_model.predict.return_value = (expected_predictions, expected_confidence)
         mock_pytorch_model.no_cat_var = True
         
         wrapper = FastTextWrapper(fasttext_config)
@@ -196,30 +195,27 @@ class TestFastTextWrapper:
         result = wrapper.predict(sample_text_data)
         
         mock_pytorch_model.predict.assert_called_once()
-        np.testing.assert_array_equal(result, expected_predictions)
+        # The wrapper should squeeze the top_k dimension for top_k=1
+        expected_result = np.array([1, 0, 1])
+        np.testing.assert_array_equal(result, expected_result)
     
-    @patch('torchTextClassifiers.classifiers.fasttext.wrapper.check_X')
+    @patch('torchTextClassifiers.classifiers.fasttext.wrapper.FastTextWrapper.predict')
     @patch('torchTextClassifiers.classifiers.fasttext.wrapper.check_Y')
-    def test_validate_success(self, mock_check_Y, mock_check_X, fasttext_config, 
-                             sample_text_data, sample_labels, mock_dataset):
+    def test_validate_success(self, mock_check_Y, mock_predict, fasttext_config, 
+                             sample_text_data, sample_labels):
         """Test successful validation."""
-        mock_check_X.return_value = (sample_text_data, None, True)
-        mock_check_Y.return_value = sample_labels
-        mock_dataset.create_dataloader.return_value = Mock()
+        mock_predictions = np.array([1, 0, 1])
+        mock_predict.return_value = mock_predictions
+        mock_check_Y.return_value = np.array([1, 0, 1])  # Perfect predictions
         
         wrapper = FastTextWrapper(fasttext_config)
         wrapper.trained = True
-        wrapper.tokenizer = Mock()
-        wrapper.pytorch_model = Mock()
-        wrapper.pytorch_model.no_cat_var = True
-        wrapper.trainer = Mock()
-        wrapper.trainer.test.return_value = [0.85]
-        wrapper.config.num_categorical_features = None
         
-        with patch('torchTextClassifiers.classifiers.fasttext.wrapper.FastTextModelDataset', return_value=mock_dataset):
-            result = wrapper.validate(sample_text_data, sample_labels)
+        result = wrapper.validate(sample_text_data, sample_labels)
         
-        assert isinstance(result, list)
+        mock_predict.assert_called_once_with(sample_text_data)
+        mock_check_Y.assert_called_once_with(sample_labels)
+        assert result == 1.0  # Perfect accuracy
     
     def test_create_dataset(self, fasttext_config, sample_text_data, sample_labels, mock_tokenizer):
         """Test dataset creation."""

@@ -10,9 +10,8 @@ from torchTextClassifiers.torchTextClassifiers import (
     ClassifierType, 
     ClassifierFactory
 )
-from torchTextClassifiers.classifiers.fasttext.config import FastTextConfig
+from torchTextClassifiers.classifiers.fasttext.core import FastTextConfig, FastTextFactory
 from torchTextClassifiers.classifiers.fasttext.wrapper import FastTextWrapper
-from torchTextClassifiers.classifiers.fasttext.factory import FastTextFactory
 
 
 class TestClassifierType:

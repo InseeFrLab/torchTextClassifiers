@@ -16,8 +16,9 @@ classifiers = [
 ]
 keywords = ["fastText", "text classification", "NLP", "automatic coding", "deep learning"]
 dependencies = [
+    "mlflow>=3.1.0",
     "numpy>=1.26.4",
-    "pytorch-lightning>=2.4.0"
+    "pytorch-lightning>=2.4.0",
 ]
 requires-python = ">=3.11"
 version="0.0.0-dev"
@@ -31,6 +32,15 @@ dev = [
   "nltk",
   "unidecode",
   "captum"
+]
+docs = [
+  "sphinx>=5.0.0",
+  "sphinx-rtd-theme>=1.2.0",
+  "sphinx-autodoc-typehints>=1.19.0",
+  "sphinxcontrib-napoleon>=0.7",
+  "sphinx-copybutton>=0.5.0",
+  "myst-parser>=0.18.0",
+  "sphinx-design>=0.3.0"
 ]
 
 [project.optional-dependencies]

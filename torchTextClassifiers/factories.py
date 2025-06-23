@@ -24,7 +24,7 @@ def create_config_from_dict(classifier_type: str, config_dict: dict) -> BaseClas
 def _register_fasttext_factory():
     """Register FastText config factory."""
     try:
-        from .classifiers.fasttext.factory import FastTextFactory
+        from .classifiers.fasttext.core import FastTextFactory
         register_config_factory("fasttext", FastTextFactory.from_dict)
     except ImportError:
         pass  # FastText module not available

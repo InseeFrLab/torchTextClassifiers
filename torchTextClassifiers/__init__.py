@@ -45,7 +45,7 @@ from .torchTextClassifiers import torchTextClassifiers, ClassifierType, Classifi
 
 # Convenience imports for FastText
 try:
-    from .classifiers.fasttext.factory import FastTextFactory
+    from .classifiers.fasttext.core import FastTextFactory
     
     # Expose FastText convenience methods at package level for easy access
     create_fasttext = FastTextFactory.create_fasttext

@@ -1,20 +1,107 @@
-"""FastText classifier factory and convenience methods.
+"""FastText classifier core components.
 
-This module provides factory methods for creating FastText classifiers with
-simplified APIs. It offers both high-level convenience methods and advanced
-methods for creating classifiers from existing tokenizers.
+This module contains the core components for FastText classification:
+- Configuration dataclass
+- Loss functions
+- Factory methods for creating classifiers
+
+Consolidates what was previously in config.py, losses.py, and factory.py.
 """
 
-from typing import Optional, List, TYPE_CHECKING
+from dataclasses import dataclass, field, asdict
+from abc import ABC, abstractmethod
+from ..base import BaseClassifierConfig
+from typing import Optional, List, TYPE_CHECKING, Union, Dict, Any
 import numpy as np
-
-from .config import FastTextConfig
-from .wrapper import FastTextWrapper
-from .tokenizer import NGramTokenizer
+import torch
+import torch.nn.functional as F
+from torch import nn
 
 if TYPE_CHECKING:
     from ...torchTextClassifiers import torchTextClassifiers, ClassifierType
 
+
+# ============================================================================
+# Configuration
+# ============================================================================
+
+@dataclass
+class FastTextConfig(BaseClassifierConfig):
+    """Configuration for FastText classifier."""
+    # Embedding matrix
+    embedding_dim: int
+    sparse: bool
+
+    # Tokenizer-related
+    num_tokens: int
+    min_count: int
+    min_n: int
+    max_n: int
+    len_word_ngrams: int
+
+    # Optional parameters
+    num_classes: Optional[int] = None
+    num_rows: Optional[int] = None
+
+    # Categorical variables
+    categorical_vocabulary_sizes: Optional[List[int]] = None
+    categorical_embedding_dims: Optional[Union[List[int], int]] = None
+    num_categorical_features: Optional[int] = None
+
+    # Model-specific parameters
+    direct_bagging: Optional[bool] = True
+    
+    # Training parameters
+    learning_rate: float = 4e-3
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "FastTextConfig":
+        return cls(**data)
+
+
+# ============================================================================
+# Loss Functions
+# ============================================================================
+
+class OneVsAllLoss(nn.Module):
+    def __init__(self):
+        super(OneVsAllLoss, self).__init__()
+
+    def forward(self, logits, targets):
+        """
+        Compute One-vs-All loss
+
+        Args:
+            logits: Tensor of shape (batch_size, num_classes) containing classification scores
+            targets: Tensor of shape (batch_size) containing true class indices
+
+        Returns:
+            loss: Mean loss value across the batch
+        """
+
+        num_classes = logits.size(1)
+
+        # Convert targets to one-hot encoding
+        targets_one_hot = F.one_hot(targets, num_classes=num_classes).float()
+
+        # For each sample, treat the true class as positive and all others as negative
+        # Using binary cross entropy for each class
+        loss = F.binary_cross_entropy_with_logits(
+            logits,  # Raw logits
+            targets_one_hot,  # Target probabilities
+            reduction="none",  # Don't reduce yet to allow for custom weighting if needed
+        )
+
+        # Sum losses across all classes for each sample, then take mean across batch
+        return loss.sum(dim=1).mean()
+
+
+# ============================================================================
+# Factory Methods
+# ============================================================================
 
 class FastTextFactory:
     """Factory class for creating FastText classifiers with convenience methods.
@@ -59,7 +146,7 @@ class FastTextFactory:
             torchTextClassifiers: Initialized FastText classifier instance
             
         Example:
-            >>> from torchTextClassifiers.classifiers.fasttext.factory import FastTextFactory
+            >>> from torchTextClassifiers.classifiers.fasttext.core import FastTextFactory
             >>> classifier = FastTextFactory.create_fasttext(
             ...     embedding_dim=100,
             ...     sparse=False,
@@ -87,7 +174,7 @@ class FastTextFactory:
     
     @staticmethod
     def build_from_tokenizer(
-        tokenizer: NGramTokenizer,
+        tokenizer,  # NGramTokenizer
         embedding_dim: int,
         num_classes: Optional[int],
         categorical_vocabulary_sizes: Optional[List[int]] = None,
