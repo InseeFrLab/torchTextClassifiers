@@ -80,7 +80,7 @@ class FastTextWrapper(BaseClassifierWrapper):
         """Initialize Lightning module for FastText."""
         if optimizer is None:
             if lr is None:
-                raise ValueError("Please provide a learning rate")
+                lr = getattr(self.config, 'learning_rate', 4e-3)  # Use config or default
             self.optimizer = SGD if self.config.sparse else Adam
             self.optimizer_params = {"lr": lr}
         else:

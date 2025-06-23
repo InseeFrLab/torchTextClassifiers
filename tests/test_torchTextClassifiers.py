@@ -12,6 +12,7 @@ from torchTextClassifiers.torchTextClassifiers import (
 )
 from torchTextClassifiers.classifiers.fasttext.config import FastTextConfig
 from torchTextClassifiers.classifiers.fasttext.wrapper import FastTextWrapper
+from torchTextClassifiers.classifiers.fasttext.factory import FastTextFactory
 
 
 class TestClassifierType:
@@ -71,7 +72,7 @@ class TestTorchTextClassifiers:
     
     def test_create_fasttext_classmethod(self):
         """Test the create_fasttext class method."""
-        classifier = torchTextClassifiers.create_fasttext(
+        classifier = FastTextFactory.create_fasttext(
             embedding_dim=50,
             sparse=True,
             num_tokens=5000,
@@ -90,8 +91,7 @@ class TestTorchTextClassifiers:
     
     def test_build_from_tokenizer(self, mock_tokenizer):
         """Test building classifier from existing tokenizer."""
-        classifier = torchTextClassifiers.build_from_tokenizer(
-            classifier_type=ClassifierType.FASTTEXT,
+        classifier = FastTextFactory.build_from_tokenizer(
             tokenizer=mock_tokenizer,
             embedding_dim=100,
             num_classes=2,
@@ -105,31 +105,20 @@ class TestTorchTextClassifiers:
     
     def test_build_from_tokenizer_missing_attributes(self):
         """Test build_from_tokenizer with tokenizer missing attributes."""
-        incomplete_tokenizer = Mock()
-        # Only set some attributes, missing others
-        incomplete_tokenizer.min_count = 1
-        # Missing: min_n, max_n, num_tokens, word_ngrams
+        class IncompleteTokenizer:
+            def __init__(self):
+                self.min_count = 1
+                # Missing: min_n, max_n, num_tokens, word_ngrams
+        
+        incomplete_tokenizer = IncompleteTokenizer()
         
         with pytest.raises(ValueError, match="Missing attributes in tokenizer"):
-            torchTextClassifiers.build_from_tokenizer(
-                classifier_type=ClassifierType.FASTTEXT,
+            FastTextFactory.build_from_tokenizer(
                 tokenizer=incomplete_tokenizer,
                 embedding_dim=100,
                 num_classes=2
             )
     
-    def test_build_from_tokenizer_unsupported_type(self, mock_tokenizer):
-        """Test build_from_tokenizer with unsupported classifier type."""
-        mock_type = Mock()
-        mock_type.name = "UNSUPPORTED"
-        
-        with pytest.raises(ValueError, match="Unsupported classifier type"):
-            torchTextClassifiers.build_from_tokenizer(
-                classifier_type=mock_type,
-                tokenizer=mock_tokenizer,
-                embedding_dim=100,
-                num_classes=2
-            )
     
     @patch('torchTextClassifiers.torchTextClassifiers.check_X')
     def test_build_tokenizer(self, mock_check_X, fasttext_config, sample_text_data):
@@ -207,8 +196,8 @@ class TestTorchTextClassifiers:
                                        sample_text_data):
         """Test build method with invalid label range."""
         mock_check_X.return_value = (sample_text_data, None, True)
-        # Labels with values >= num_classes (invalid)
-        invalid_labels = np.array([0, 1, 2, 3])  # 3 >= num_classes (2)
+        # Labels with values that don't start from 0 or have gaps (invalid)
+        invalid_labels = np.array([0, 1, 5])  # Max value 5 but only 3 unique values, so num_classes=3 but max=5
         mock_check_Y.return_value = invalid_labels
         
         classifier = torchTextClassifiers(ClassifierType.FASTTEXT, fasttext_config)
@@ -298,9 +287,13 @@ class TestTorchTextClassifiers:
     
     def test_predict_and_explain_not_supported(self, fasttext_config, sample_text_data):
         """Test predict_and_explain when not supported by wrapper."""
+        
+        # Create a mock wrapper class that doesn't have predict_and_explain
+        class MockWrapperWithoutExplain:
+            pass
+        
         classifier = torchTextClassifiers(ClassifierType.FASTTEXT, fasttext_config)
-        # Remove the predict_and_explain method to simulate unsupported
-        delattr(classifier.classifier_wrapper, 'predict_and_explain')
+        classifier.classifier_wrapper = MockWrapperWithoutExplain()
         
         with pytest.raises(NotImplementedError, match="Explanation not supported"):
             classifier.predict_and_explain(sample_text_data)

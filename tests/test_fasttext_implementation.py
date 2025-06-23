@@ -156,13 +156,20 @@ class TestFastTextWrapper:
         assert wrapper.lightning_module == mock_module
         assert wrapper.optimizer_params == {"lr": 0.01}
     
-    def test_check_and_init_lightning_no_lr(self, fasttext_config, mock_pytorch_model):
-        """Test Lightning module initialization fails without learning rate."""
+    @patch('torchTextClassifiers.classifiers.fasttext.wrapper.FastTextModule')
+    def test_check_and_init_lightning_uses_config_lr(self, mock_module_class, fasttext_config, mock_pytorch_model):
+        """Test Lightning module initialization uses config learning rate as default."""
         wrapper = FastTextWrapper(fasttext_config)
         wrapper.pytorch_model = mock_pytorch_model
+        mock_module = Mock()
+        mock_module_class.return_value = mock_module
         
-        with pytest.raises(ValueError, match="Please provide a learning rate"):
-            wrapper._check_and_init_lightning()
+        # Should not raise an error since learning_rate is in config
+        wrapper._check_and_init_lightning()
+        
+        # Check that the learning rate from config was used
+        assert wrapper.optimizer_params['lr'] == fasttext_config.learning_rate
+        assert wrapper.lightning_module == mock_module
     
     @patch('torchTextClassifiers.classifiers.fasttext.wrapper.check_X')
     def test_predict_not_trained(self, mock_check_X, fasttext_config, sample_text_data):

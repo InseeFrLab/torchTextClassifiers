@@ -167,14 +167,14 @@ class TestBaseClassifierWrapper:
         # Test create_dataset
         labels = np.array([1, 0])
         dataset = wrapper.create_dataset(sample_texts[:2], labels)
-        assert dataset["texts"] is sample_texts[:2]
-        assert dataset["labels"] is labels
+        np.testing.assert_array_equal(dataset["texts"], sample_texts[:2])
+        np.testing.assert_array_equal(dataset["labels"], labels)
         assert dataset["categorical"] is None
         
         # Test create_dataset with categorical
         categorical = np.array([[1, 2], [3, 4]])
         dataset_with_cat = wrapper.create_dataset(sample_texts[:2], labels, categorical)
-        assert dataset_with_cat["categorical"] is categorical
+        np.testing.assert_array_equal(dataset_with_cat["categorical"], categorical)
         
         # Test create_dataloader
         dataloader = wrapper.create_dataloader(dataset, batch_size=32, num_workers=4, shuffle=False)

@@ -23,16 +23,20 @@ def test_classifier_factory_pattern():
     assert hasattr(ClassifierFactory, 'register_classifier')
 
 
-def test_dataclass_structure():
-    """Test that the main class has the expected dataclass structure."""
+def test_class_structure():
+    """Test that the main class has the expected class structure."""
     # We can test the class structure without instantiating
     from torchTextClassifiers.torchTextClassifiers import torchTextClassifiers
     
-    # Check that it has the expected attributes defined
-    annotations = torchTextClassifiers.__annotations__
-    assert 'classifier_type' in annotations
-    assert 'config' in annotations
-    assert 'classifier_wrapper' in annotations
+    # Check that it has the expected methods defined
+    assert hasattr(torchTextClassifiers, '__init__')
+    assert hasattr(torchTextClassifiers, 'build_tokenizer')
+    assert hasattr(torchTextClassifiers, 'build')
+    assert hasattr(torchTextClassifiers, 'train')
+    assert hasattr(torchTextClassifiers, 'predict')
+    assert hasattr(torchTextClassifiers, 'validate')
+    assert hasattr(torchTextClassifiers, 'to_json')
+    assert hasattr(torchTextClassifiers, 'from_json')
 
 
 def test_abstract_base_classes():
@@ -59,28 +63,21 @@ def test_utilities_import():
     assert NumpyJSONEncoder is not None
 
 
-@patch('torchTextClassifiers.torchTextClassifiers.ClassifierFactory')
-def test_torchTextClassifiers_initialization_pattern(mock_factory):
+def test_torchTextClassifiers_initialization_pattern():
     """Test the initialization pattern using mocks."""
     from torchTextClassifiers.torchTextClassifiers import torchTextClassifiers, ClassifierType
     
-    # Mock the factory
-    mock_wrapper = Mock()
-    mock_factory.create_classifier.return_value = mock_wrapper
-    mock_config = Mock()
-    
-    # Create instance (this will call __post_init__)
-    with patch.object(torchTextClassifiers, '__post_init__') as mock_post_init:
-        classifier = torchTextClassifiers.__new__(torchTextClassifiers)
-        classifier.classifier_type = ClassifierType.FASTTEXT
-        classifier.config = mock_config
-        classifier.classifier_wrapper = None
+    with patch('torchTextClassifiers.torchTextClassifiers.ClassifierFactory.create_classifier') as mock_create_classifier:
+        # Mock the factory
+        mock_wrapper = Mock()
+        mock_create_classifier.return_value = mock_wrapper
+        mock_config = Mock()
         
-        # Manually call post_init to test the logic
-        classifier.__post_init__()
+        # Create instance (this will call __post_init__)
+        classifier = torchTextClassifiers(ClassifierType.FASTTEXT, mock_config)
         
         # Verify factory was called correctly
-        mock_factory.create_classifier.assert_called_once_with(
+        mock_create_classifier.assert_called_once_with(
             ClassifierType.FASTTEXT, mock_config
         )
         assert classifier.classifier_wrapper == mock_wrapper
@@ -106,38 +103,29 @@ def test_numpy_json_encoder():
     assert loaded_data["regular"] == "string"
 
 
-@patch('torchTextClassifiers.torchTextClassifiers.FastTextWrapper')
-@patch('torchTextClassifiers.torchTextClassifiers.ClassifierType')
-def test_create_fasttext_classmethod(mock_classifier_type, mock_wrapper_class):
-    """Test the create_fasttext class method."""
-    from torchTextClassifiers.torchTextClassifiers import torchTextClassifiers
+def test_create_fasttext_classmethod():
+    """Test the create_fasttext class method through FastTextFactory."""
+    from torchTextClassifiers.classifiers.fasttext.factory import FastTextFactory
+    from torchTextClassifiers.torchTextClassifiers import torchTextClassifiers, ClassifierType
     
-    # Mock the config creation
-    with patch('torchTextClassifiers.torchTextClassifiers.FastTextConfig') as mock_config_class:
-        mock_config = Mock()
-        mock_config_class.return_value = mock_config
-        
-        # Mock the classifier creation
-        mock_instance = Mock()
-        with patch.object(torchTextClassifiers, '__new__') as mock_new:
-            mock_new.return_value = mock_instance
-            
-            result = torchTextClassifiers.create_fasttext(
-                embedding_dim=50,
-                sparse=True,
-                num_tokens=5000,
-                min_count=2,
-                min_n=2,
-                max_n=5,
-                len_word_ngrams=3
-            )
-            
-            # Verify config was created with correct parameters
-            mock_config_class.assert_called_once()
-            call_kwargs = mock_config_class.call_args[1]
-            assert call_kwargs['embedding_dim'] == 50
-            assert call_kwargs['sparse'] == True
-            assert call_kwargs['num_tokens'] == 5000
+    # Just test that it creates a real instance and config properly
+    result = FastTextFactory.create_fasttext(
+        embedding_dim=50,
+        sparse=True,
+        num_tokens=5000,
+        min_count=2,
+        min_n=2,
+        max_n=5,
+        len_word_ngrams=3,
+        num_classes=2
+    )
+    
+    # Verify the result is a proper torchTextClassifiers instance
+    assert isinstance(result, torchTextClassifiers)
+    assert result.classifier_type == ClassifierType.FASTTEXT
+    assert result.config.embedding_dim == 50
+    assert result.config.sparse == True
+    assert result.config.num_tokens == 5000
 
 
 def test_method_delegation_pattern():

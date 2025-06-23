@@ -28,6 +28,9 @@ class FastTextConfig(BaseClassifierConfig):
 
     # Model-specific parameters
     direct_bagging: Optional[bool] = True
+    
+    # Training parameters
+    learning_rate: float = 4e-3
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)

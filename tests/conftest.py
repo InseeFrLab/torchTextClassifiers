@@ -50,19 +50,18 @@ def sample_X_text_only(sample_text_data):
 @pytest.fixture
 def fasttext_config():
     """Mock FastText configuration."""
-    config = Mock()
-    config.embedding_dim = 10
-    config.sparse = False
-    config.num_tokens = 1000
-    config.min_count = 1
-    config.min_n = 3
-    config.max_n = 6
-    config.len_word_ngrams = 2
-    config.num_classes = 2
-    config.num_rows = None
-    config.num_categorical_features = None
-    config.categorical_vocabulary_sizes = None
-    config.to_dict = Mock(return_value={'embedding_dim': 10, 'sparse': False})
+    from torchTextClassifiers.classifiers.fasttext.config import FastTextConfig
+    
+    config = FastTextConfig(
+        embedding_dim=10,
+        sparse=False,
+        num_tokens=1000,
+        min_count=1,
+        min_n=3,
+        max_n=6,
+        len_word_ngrams=2,
+        num_classes=2
+    )
     return config
 
 
