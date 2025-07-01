@@ -136,6 +136,7 @@ def stratified_split_rare_labels(X, y, test_size=0.2, min_train_samples=1):
 
     return X_train, X_test, y_train, y_test
 
+
 def load_and_prepare_data():
     """Load and prepare the same data as used in the notebook"""
     print("📊 Using Sirene dataset sample for demonstration...")
@@ -246,8 +247,10 @@ def train_and_evaluate_model(X, y, model_name, use_categorical=False):
             "min_n": 3,
             "max_n": 6,
             "len_word_ngrams": 2,
+            "categorical_embedding_dims": 10,
+            #"num_categorical_features": num_cat_var,
             "categorical_vocabulary_sizes": vocab_sizes,
-            "categorical_embedding_dims": [10] * len(vocab_sizes)
+            #"categorical_embedding_dims": 10
         }
         print(f"   Categorical vocabulary sizes: {vocab_sizes}")
     else:
@@ -265,10 +268,15 @@ def train_and_evaluate_model(X, y, model_name, use_categorical=False):
     # Training parameters - reduced to save disk space
     train_params = {
         "num_epochs": 10,
-        "batch_size": 128,
-        "patience_train": 2,
-        "lr": 0.001,
-        "verbose": False
+        "batch_size": 256,
+        "patience_train": 3,
+        "lr": 0.004,
+        "verbose": True
+    }
+
+    extra_trainer_params = {
+        "enable_progress_bar": False,
+        
     }
     
     # Create and build model
@@ -279,9 +287,8 @@ def train_and_evaluate_model(X, y, model_name, use_categorical=False):
     
     # Train model - disable logging to save disk space
     classifier.train(
-        X_train, y_train, X_test, y_test,
-        enable_progress_bar=False,
-        **train_params
+        X_train, y_train, X_val, y_val, **train_params,
+        trainer_params=extra_trainer_params
     )
     
     training_time = time.time() - start_time
@@ -352,97 +359,8 @@ def analyze_predictions(results_text_only, results_mixed, encoder=None, sample_t
         print("   - Improved classification for sector-specific patterns")
         print("   - Enhanced performance on companies with specific characteristics")
 
-def analyze_text_only_predictions(results, encoder=None, sample_texts=None):
-    """Detailed analysis of text-only model predictions"""
-    predictions = results['predictions']
-    y_test = results['y_test']
-    
-    print(f"\n📊 Text-Only Model Performance:")
-    print(f"   Test Accuracy: {results['test_accuracy']:.3f}")
-    print(f"   Total Test Samples: {len(y_test)}")
-    
-    # Confusion matrix analysis
-    from sklearn.metrics import classification_report, confusion_matrix
-    import pandas as pd
-    
-    # Get unique classes
-    unique_classes = np.unique(y_test)
-    print(f"   Number of Classes: {len(unique_classes)}")
-    
-    # Per-class accuracy
-    print(f"\n📋 Per-Class Performance (showing classes with >5 samples):")
-    print(f"{'Class':<8} {'Samples':<8} {'Accuracy':<10} {'Correct':<8} {'Total':<8}")
-    print("-" * 50)
-    
-    class_accuracies = []
-    for class_id in unique_classes:
-        class_mask = y_test == class_id
-        class_samples = np.sum(class_mask)
-        
-        if class_samples > 5:  # Only show classes with enough samples
-            correct = np.sum(predictions[class_mask] == class_id)
-            accuracy = correct / class_samples if class_samples > 0 else 0
-            class_accuracies.append(accuracy)
-            
-            print(f"{class_id:<8} {class_samples:<8} {accuracy:<10.3f} {correct:<8} {class_samples:<8}")
-    
-    if class_accuracies:
-        print("-" * 50)
-        print(f"Average per-class accuracy: {np.mean(class_accuracies):.3f}")
-        print(f"Std deviation: {np.std(class_accuracies):.3f}")
-    
-    # Show some example predictions
-    print(f"\n🔍 Example Predictions (first 10 samples):")
-    print(f"{'Index':<6} {'True':<6} {'Pred':<6} {'Correct':<8} {'Text Sample'}")
-    print("-" * 80)
-    
-    for i in range(min(10, len(y_test))):
-        correct_symbol = "✅" if predictions[i] == y_test[i] else "❌"
-        text_sample = sample_texts[i][:50] + "..." if sample_texts is not None and len(sample_texts[i]) > 50 else (sample_texts[i] if sample_texts is not None else "N/A")
-        print(f"{i:<6} {y_test[i]:<6} {predictions[i]:<6} {correct_symbol:<8} {text_sample}")
-    
-    # Prediction distribution
-    print(f"\n📊 Prediction Distribution:")
-    pred_unique, pred_counts = np.unique(predictions, return_counts=True)
-    true_unique, true_counts = np.unique(y_test, return_counts=True)
-    
-    print("Top 5 most predicted classes:")
-    sorted_indices = np.argsort(pred_counts)[::-1]
-    for i in range(min(5, len(pred_unique))):
-        idx = sorted_indices[i]
-        class_id = pred_unique[idx]
-        count = pred_counts[idx]
-        percentage = count / len(predictions) * 100
-        print(f"   Class {class_id}: {count} predictions ({percentage:.1f}%)")
 
-def demonstrate_categorical_impact(X_mixed_sample, results_text_only):
-    """Demonstrate potential impact of categorical features"""
-    print(f"\n🔬 Categorical Features Impact Analysis:")
-    print("=" * 50)
-    
-    print("📋 Available Categorical Features:")
-    print("   - EVT (Event Type): Business creation, modification, etc.")
-    print("   - CJ (Legal Form): SARL, SAS, Association, etc.")
-    print("   - NAT (Activity Nature): Commercial, artisanal, liberal, etc.")
-    print("   - TYP (Declaration Type): Principal, secondary establishment")
-    print("   - CRT (Creation Type): New creation, transfer, etc.")
-    print("   - SRF (Surface Category): Small (<120m²), Medium (120-400m²), Large (>400m²)")
-    
-    print(f"\n📊 Categorical Feature Distribution (sample of {len(X_mixed_sample)} businesses):")
-    
-    # Analyze categorical features distribution
-    feature_names = ['EVT', 'CJ', 'NAT', 'TYP', 'CRT', 'SRF']
-    for i, feature_name in enumerate(feature_names):
-        feature_col = X_mixed_sample[:, i + 1].astype(int)  # +1 because first column is text
-        unique_vals, counts = np.unique(feature_col, return_counts=True)
-        print(f"   {feature_name}: {len(unique_vals)} categories, most common: {unique_vals[np.argmax(counts)]} ({np.max(counts)} samples)")
-    
-    print(f"\n💡 Expected Benefits of Mixed Model (when bug is fixed):")
-    print("   1. Better sector classification for similar text descriptions")
-    print("   2. Disambiguation of companies with identical activities but different contexts")
-    print("   3. Improved handling of short or ambiguous business descriptions")
-    print("   4. Enhanced classification for administrative vs. commercial activities")
-    print("   5. Better performance on companies with specific legal structures")
+
 
 def main():
     print("🔀 FastText Classifier: Categorical Features Comparison")

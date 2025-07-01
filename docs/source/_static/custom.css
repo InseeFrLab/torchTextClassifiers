@@ -1,0 +1,101 @@
+/* Custom CSS for torchTextClassifiers documentation */
+
+/* Improve code block styling */
+.highlight {
+    background-color: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    padding: 1rem;
+    margin: 1rem 0;
+}
+
+/* Architecture diagrams */
+.architecture-diagram {
+    font-family: monospace;
+    background-color: #f6f8fa;
+    padding: 1rem;
+    border-radius: 6px;
+    overflow-x: auto;
+    white-space: pre;
+}
+
+/* API reference styling */
+.api-reference .class {
+    border-left: 4px solid #2980b9;
+    padding-left: 1rem;
+    margin: 1rem 0;
+}
+
+/* Examples styling */
+.example-section {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin: 2rem 0;
+}
+
+/* Performance tips */
+.performance-tip {
+    background-color: #e8f5e8;
+    border-left: 4px solid #28a745;
+    padding: 1rem;
+    margin: 1rem 0;
+}
+
+/* Warning boxes */
+.warning {
+    background-color: #fff3cd;
+    border-left: 4px solid #ffc107;
+    padding: 1rem;
+    margin: 1rem 0;
+}
+
+/* Navigation improvements */
+.wy-nav-content {
+    max-width: 1200px;
+}
+
+/* Table styling */
+table {
+    margin: 1rem 0;
+    border-collapse: collapse;
+    width: 100%;
+}
+
+table th, table td {
+    border: 1px solid #dee2e6;
+    padding: 0.75rem;
+    text-align: left;
+}
+
+table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+}
+
+/* Responsive improvements */
+@media (max-width: 768px) {
+    .architecture-diagram {
+        font-size: 0.8rem;
+    }
+    
+    .wy-nav-content {
+        margin-left: 0;
+    }
+}
+
+/* Syntax highlighting improvements */
+.highlight .k { color: #0000ff; } /* Keywords */
+.highlight .s { color: #008000; } /* Strings */
+.highlight .c { color: #808080; } /* Comments */
+.highlight .n { color: #000000; } /* Names */
+
+/* Footer styling */
+.footer {
+    margin-top: 2rem;
+    padding-top: 1rem;
+    border-top: 1px solid #dee2e6;
+    color: #6c757d;
+    font-size: 0.9rem;
+}
