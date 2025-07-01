@@ -81,27 +81,49 @@ uv run python advanced_training.py
 - Training parameter tuning
 - Model performance comparison
 
-### 5. [MLflow Integration](mlflow_integration.py)
-Demonstrates MLflow integration for experiment tracking and model management:
-- Training and logging models to MLflow
-- Experiment tracking with metrics and parameters
-- Model versioning and registry
-- Loading models from MLflow for inference
-- Model artifact management
+### 5. [Categorical Comparison](categorical_comparison.py)
+Compares model performance with and without categorical features:
+- Loading real-world data (Sirene dataset)
+- Feature engineering and preprocessing
+- Model comparison with statistical analysis
+- Performance evaluation and visualization
 
 **Run the example:**
 ```bash
 cd examples
-pip install mlflow  # Install MLflow first
-uv run python mlflow_integration.py
+uv run python categorical_comparison.py
 ```
 
 **What you'll learn:**
-- MLflow experiment tracking setup
-- Model logging and versioning
-- Loading models for inference
-- Model registry management
-- Reproducible ML workflows
+- Real-world data handling
+- Feature impact analysis
+- Statistical model comparison
+- Data preprocessing techniques
+
+### 6. [Simple Explainability](simple_explainability_example.py)
+Demonstrates model explainability with ASCII histogram visualizations:
+- Training a FastText classifier with enhanced data
+- Word-level contribution analysis
+- ASCII histogram visualization in terminal
+- Interactive mode for custom text analysis
+- Real-time prediction explanations
+
+**Run the example:**
+```bash
+cd examples
+# Regular mode - analyze predefined examples
+uv run python simple_explainability_example.py
+
+# Interactive mode - analyze your own text
+uv run python simple_explainability_example.py --interactive
+```
+
+**What you'll learn:**
+- Model explainability and interpretation
+- Word importance analysis
+- Interactive prediction tools
+- ASCII-based data visualization
+- Real-time model analysis
 
 ## 🚀 Quick Start
 
@@ -189,6 +211,118 @@ Class distribution: Negative=5, Neutral=5, Positive=5
    Text: Fantastic! Love every aspect of it!
 
 Final Accuracy: 3/6 = 0.500
+```
+
+### Simple Explainability
+```
+🔍 Simple Explainability Example
+
+🔍 Testing explainability on 5 examples:
+============================================================
+
+📝 Example 1:
+Text: 'This product is amazing!'
+Prediction: Positive
+
+📊 Word Contribution Histogram:
+--------------------------------------------------
+        This | ██████████████████████████████ 0.3549
+     product | █████████████                  0.1651
+          is | ████████████████████████       0.2844
+    amazing! | ████████████████               0.1956
+--------------------------------------------------
+✅ Analysis completed for example 1
+
+📝 Example 2:
+Text: 'Poor quality and terrible service'
+Prediction: Negative
+⚠️  Explainability failed: 
+✅ Analysis completed for example 2
+
+📝 Example 3:
+Text: 'Great value for money'
+Prediction: Positive
+
+📊 Word Contribution Histogram:
+--------------------------------------------------
+       Great | ██████████████████████████████ 0.3287
+       value | ████████████████████           0.2220
+         for | ██████████████████████████     0.2929
+       money | ██████████████                 0.1564
+--------------------------------------------------
+✅ Analysis completed for example 3
+
+📝 Example 4:
+Text: 'Completely disappointing and awful experience'
+Prediction: Negative
+
+📊 Word Contribution Histogram:
+--------------------------------------------------
+  Completely | ██████████                     0.1673
+disappointing | ██████████████████████████████ 0.4676
+         and | █████                          0.0910
+       awful | ███████                        0.1225
+  experience | █████████                      0.1516
+--------------------------------------------------
+✅ Analysis completed for example 4
+
+📝 Example 5:
+Text: 'Love this excellent design'
+Prediction: Positive
+
+📊 Word Contribution Histogram:
+--------------------------------------------------
+        Love | ██████████████████             0.2330
+        this | ████████████████████           0.2525
+   excellent | ██████████████████████████████ 0.3698
+      design | ███████████                    0.1447
+--------------------------------------------------
+✅ Analysis completed for example 5
+
+🎉 Explainability analysis completed for 5 examples!
+
+💡 Tip: Use --interactive flag to enter interactive mode for custom text analysis!
+   Example: uv run python examples/simple_explainability_example.py --interactive
+```
+
+### Interactive Explainability Mode
+```
+============================================================
+🎯 Interactive Explainability Mode
+============================================================
+Enter your own text to see predictions and explanations!
+Type 'quit' or 'exit' to end the session.
+
+💬 Enter text: Amazing product quality!
+
+🔍 Analyzing: 'Amazing product quality!'
+🎯 Prediction: Positive
+
+📊 Word Contribution Histogram:
+--------------------------------------------------
+     Amazing | ██████████████████████████████ 0.5429
+     product | ██████████████                 0.2685
+    quality! | ██████████                     0.1886
+--------------------------------------------------
+💡 Most influential word: 'Amazing' (score: 0.5429)
+
+--------------------------------------------------
+💬 Enter text: Terrible customer support
+
+🔍 Analyzing: 'Terrible customer support'
+🎯 Prediction: Negative
+
+📊 Word Contribution Histogram:
+--------------------------------------------------
+    Terrible | ██████████████████████████████ 0.5238
+    customer | ███████████                    0.1988
+     support | ███████████████                0.2774
+--------------------------------------------------
+💡 Most influential word: 'Terrible' (score: 0.5238)
+
+--------------------------------------------------
+💬 Enter text: quit
+👋 Thanks for using the explainability tool!
 ```
 
 ## 🛠️ Customizing Examples
