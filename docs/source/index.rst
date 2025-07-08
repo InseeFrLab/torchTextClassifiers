@@ -1,7 +1,7 @@
-torchTextClassifiers Documentation
+**torchTextClassifiers** Documentation
 ====================================
 
-Welcome to torchTextClassifiers, a unified framework for text classification with PyTorch Lightning integration.
+Welcome to **torchTextClassifiers**, a unified framework for text classification with PyTorch Lightning integration.
 
 .. image:: https://img.shields.io/badge/python-3.8%2B-blue.svg
    :target: https://python.org
@@ -18,7 +18,7 @@ Welcome to torchTextClassifiers, a unified framework for text classification wit
 Overview
 --------
 
-torchTextClassifiers provides a comprehensive, extensible framework for building and training
+**torchTextClassifiers** provides a comprehensive, extensible framework for building and training
 text classification models. It offers a unified API that abstracts away the complexity
 of different model architectures while providing flexibility for advanced users.
 
@@ -26,9 +26,10 @@ of different model architectures while providing flexibility for advanced users.
 
 * **Unified API**: Consistent interface across different model types
 * **PyTorch Lightning Integration**: Production-ready training with automatic GPU handling
-* **FastText Implementation**: Fast and efficient text classification
 * **Mixed Features Support**: Handle both text and categorical data
 * **Extensible Architecture**: Easy to add new model types
+* **Explainability**: Add explainability support (depends on classifier types)
+
 
 Quick Start
 -----------

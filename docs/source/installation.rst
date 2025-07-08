@@ -21,14 +21,9 @@ Core dependencies that will be automatically installed:
 - PyTorch >= 1.9.0
 - PyTorch Lightning >= 1.6.0
 - NumPy >= 1.19.0
-- Pandas >= 1.3.0
-- scikit-learn >= 1.0.0
 
 Optional dependencies for enhanced functionality:
 
-- Jupyter >= 1.0.0 (for notebook examples)
-- Matplotlib >= 3.3.0 (for visualization)
-- Seaborn >= 0.11.0 (for plotting)
 
 Installation Methods
 --------------------

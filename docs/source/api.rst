@@ -35,7 +35,15 @@ FastText Classifier
 Configuration and Factory
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. automodule:: torchTextClassifiers.classifiers.fasttext.fasttext
+.. automodule:: torchTextClassifiers.classifiers.fasttext.core
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Wrapper Interface
+~~~~~~~~~~~~~~~~~
+
+.. automodule:: torchTextClassifiers.classifiers.fasttext.wrapper
    :members:
    :undoc-members:
    :show-inheritance:
