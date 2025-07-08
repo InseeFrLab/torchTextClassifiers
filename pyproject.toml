@@ -16,7 +16,6 @@ classifiers = [
 ]
 keywords = ["fastText", "text classification", "NLP", "automatic coding", "deep learning"]
 dependencies = [
-    "mlflow>=3.1.0",
     "numpy>=1.26.4",
     "pytorch-lightning>=2.4.0",
 ]
@@ -31,7 +30,8 @@ dev = [
   "scikit-learn",
   "nltk",
   "unidecode",
-  "captum"
+  "captum",
+  "pyarrow"
 ]
 docs = [
   "sphinx>=5.0.0",
@@ -48,7 +48,7 @@ explainability = ["unidecode", "nltk", "captum"]
 preprocess =     ["unidecode", "nltk"]
 
 [build-system]
-requires = ["uv_build>=0.7.8,<0.8.0"]
+requires = ["uv_build>=0.7.9,<0.8.0"]
 build-backend = "uv_build"
 
 [tool.ruff]
