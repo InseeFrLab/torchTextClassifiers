@@ -43,7 +43,7 @@ uv run python multiclass_classification.py
 - Advanced result interpretation
 - Model serialization/deserialization
 
-### 3. [Mixed Features](mixed_features.py)
+### 3. [Using Additional Features](Using_additional_features.py)
 Shows how to combine text and categorical features:
 - Text + categorical data preparation
 - Feature engineering for categorical variables
@@ -53,7 +53,7 @@ Shows how to combine text and categorical features:
 **Run the example:**
 ```bash
 cd examples
-uv run python mixed_features.py
+uv run python Using_additional_features.py
 ```
 
 **What you'll learn:**
@@ -81,26 +81,7 @@ uv run python advanced_training.py
 - Training parameter tuning
 - Model performance comparison
 
-### 5. [Categorical Comparison](categorical_comparison.py)
-Compares model performance with and without categorical features:
-- Loading real-world data (Sirene dataset)
-- Feature engineering and preprocessing
-- Model comparison with statistical analysis
-- Performance evaluation and visualization
-
-**Run the example:**
-```bash
-cd examples
-uv run python categorical_comparison.py
-```
-
-**What you'll learn:**
-- Real-world data handling
-- Feature impact analysis
-- Statistical model comparison
-- Data preprocessing techniques
-
-### 6. [Simple Explainability](simple_explainability_example.py)
+### 5. [Simple Explainability](simple_explainability_example.py)
 Demonstrates model explainability with ASCII histogram visualizations:
 - Training a FastText classifier with enhanced data
 - Word-level contribution analysis
@@ -210,7 +191,7 @@ Class distribution: Negative=5, Neutral=5, Positive=5
 3. ✅ Predicted: Positive, True: Positive
    Text: Fantastic! Love every aspect of it!
 
-Final Accuracy: 3/6 = 0.500
+Final Accuracy: 3/3 = 1.000
 ```
 
 ### Simple Explainability
