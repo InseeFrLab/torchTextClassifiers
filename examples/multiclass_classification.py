@@ -123,20 +123,8 @@ def main():
         print()
     
     print(f"Final Accuracy: {correct_predictions}/{len(X_test)} = {correct_predictions/len(X_test):.3f}")
-    
-    # Save configuration
-    print("💾 Saving model configuration...")
-    classifier.to_json('multiclass_classifier_config.json')
-    print("✅ Configuration saved to 'multiclass_classifier_config.json'")
-    
-    # Demonstrate loading configuration
-    print("\n🔄 Demonstrating configuration loading...")
-    from torchTextClassifiers import torchTextClassifiers
-    loaded_classifier = torchTextClassifiers.from_json('multiclass_classifier_config.json')
-    print("✅ Configuration loaded successfully!")
-    print(f"Loaded classifier wrapper: {type(loaded_classifier.classifier_wrapper).__name__}")
-    print(f"Loaded num_classes: {loaded_classifier.config.num_classes}")
-    
+  
+   
     print("\n🎉 Multi-class example completed successfully!")
 
 if __name__ == "__main__":

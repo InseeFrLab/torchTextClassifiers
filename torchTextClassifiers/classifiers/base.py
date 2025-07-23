@@ -18,19 +18,27 @@ class BaseClassifierConfig(ABC):
         pass
 
 class BaseClassifierWrapper(ABC):
-    """Abstract base class for classifier wrappers."""
+    """Abstract base class for classifier wrappers.
+    
+    Each classifier wrapper is responsible for its own text processing approach.
+    Some may use tokenizers, others may use different preprocessing methods.
+    """
     
     def __init__(self, config: BaseClassifierConfig):
         self.config = config
-        self.tokenizer: Optional[Any] = None
         self.pytorch_model = None
         self.lightning_module = None
         self.trained: bool = False
         self.device = None
+        # Remove tokenizer from base class - it's now wrapper-specific
     
     @abstractmethod
-    def build_tokenizer(self, training_text: np.ndarray) -> None:
-        """Build tokenizer from training text."""
+    def prepare_text_features(self, training_text: np.ndarray) -> None:
+        """Prepare text features for the classifier.
+        
+        This could involve tokenization, vectorization, or other preprocessing.
+        Each classifier wrapper implements this according to its needs.
+        """
         pass
     
     @abstractmethod

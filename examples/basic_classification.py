@@ -97,11 +97,6 @@ def main():
         print(f"   Text: {text[:50]}...")
         print()
     
-    # Save configuration
-    print("💾 Saving model configuration...")
-    classifier.to_json('basic_classifier_config.json')
-    print("✅ Configuration saved to 'basic_classifier_config.json'")
-    
     print("\n🎉 Example completed successfully!")
 
 if __name__ == "__main__":

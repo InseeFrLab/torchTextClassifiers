@@ -1,3 +1,4 @@
+from typing import Optional
 from ..base import BaseClassifierWrapper
 from .core import FastTextConfig
 from .tokenizer import NGramTokenizer
@@ -17,8 +18,9 @@ class FastTextWrapper(BaseClassifierWrapper):
     def __init__(self, config: FastTextConfig):
         super().__init__(config)
         self.config: FastTextConfig = config
+        self.tokenizer: Optional[NGramTokenizer] = None  # FastText-specific tokenizer
     
-    def build_tokenizer(self, training_text: np.ndarray) -> None:
+    def prepare_text_features(self, training_text: np.ndarray) -> None:
         """Build NGram tokenizer for FastText."""
         self.tokenizer = NGramTokenizer(
             self.config.min_count,
@@ -28,6 +30,10 @@ class FastTextWrapper(BaseClassifierWrapper):
             self.config.len_word_ngrams,
             training_text,
         )
+    
+    def build_tokenizer(self, training_text: np.ndarray) -> None:
+        """Legacy method for backward compatibility."""
+        self.prepare_text_features(training_text)
     
     def _build_pytorch_model(self) -> None:
         """Build FastText PyTorch model."""

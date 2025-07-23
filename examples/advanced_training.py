@@ -236,18 +236,9 @@ def main():
         sentiment = "Positive" if pred == 1 else "Negative"
         correct = "✅" if pred == true else "❌"
         print(f"{i+1}. {correct} {sentiment}: {text[:50]}...")
-    
-    # Save the best model configuration
-    print(f"\n💾 Saving {best_method.lower()} model configuration...")
-    best_classifier.to_json(f'advanced_{best_method.lower()}_config.json')
-    print(f"✅ Configuration saved to 'advanced_{best_method.lower()}_config.json'")
-    
+
     print("\n🎉 Advanced training example completed successfully!")
-    print("\n💡 Key takeaways:")
-    print("- Different training configurations can significantly impact performance")
-    print("- GPU acceleration helps with larger models and datasets")
-    print("- Gradient clipping and accumulation can improve training stability")
-    print("- Custom Lightning trainer parameters provide fine-grained control")
+
 
 if __name__ == "__main__":
     main()

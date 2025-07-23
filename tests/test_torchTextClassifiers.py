@@ -81,11 +81,11 @@ class TestTorchTextClassifiers:
         
         wrapper = FastTextWrapper(fasttext_config)
         classifier = torchTextClassifiers(wrapper)
-        classifier.classifier_wrapper.build_tokenizer = Mock()
+        classifier.classifier_wrapper.prepare_text_features = Mock()
         
         classifier.build_tokenizer(sample_text_data)
         
-        classifier.classifier_wrapper.build_tokenizer.assert_called_once_with(sample_text_data)
+        classifier.classifier_wrapper.prepare_text_features.assert_called_once_with(sample_text_data)
     
     @patch('torchTextClassifiers.torchTextClassifiers.check_X')
     @patch('torchTextClassifiers.torchTextClassifiers.check_Y')
@@ -97,14 +97,14 @@ class TestTorchTextClassifiers:
         
         wrapper = FastTextWrapper(fasttext_config)
         classifier = torchTextClassifiers(wrapper)
-        classifier.classifier_wrapper.build_tokenizer = Mock()
+        classifier.classifier_wrapper.prepare_text_features = Mock()
         classifier.classifier_wrapper._build_pytorch_model = Mock()
         classifier.classifier_wrapper._check_and_init_lightning = Mock()
         
         classifier.build(sample_text_data, sample_labels)
         
         # Verify methods were called
-        classifier.classifier_wrapper.build_tokenizer.assert_called_once()
+        classifier.classifier_wrapper.prepare_text_features.assert_called_once()
         classifier.classifier_wrapper._build_pytorch_model.assert_called_once()
         classifier.classifier_wrapper._check_and_init_lightning.assert_called_once()
         
@@ -125,7 +125,7 @@ class TestTorchTextClassifiers:
         
         wrapper = FastTextWrapper(config)
         classifier = torchTextClassifiers(wrapper)
-        classifier.classifier_wrapper.build_tokenizer = Mock()
+        classifier.classifier_wrapper.prepare_text_features = Mock()
         classifier.classifier_wrapper._build_pytorch_model = Mock()
         classifier.classifier_wrapper._check_and_init_lightning = Mock()
         

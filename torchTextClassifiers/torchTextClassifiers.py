@@ -93,9 +93,8 @@ class torchTextClassifiers:
     def build_tokenizer(self, training_text: np.ndarray) -> None:
         """Build tokenizer from training text data.
         
-        This method creates and trains a tokenizer using the provided text data.
-        The tokenizer learns vocabulary and encoding schemes specific to the
-        classifier type (e.g., n-gram tokenization for FastText).
+        This method is kept for backward compatibility. It delegates to
+        prepare_text_features which handles the actual text preprocessing.
         
         Args:
             training_text: Array of text strings to build the tokenizer from
@@ -105,7 +104,23 @@ class torchTextClassifiers:
             >>> texts = np.array(["Hello world", "This is a test", "Another example"])
             >>> classifier.build_tokenizer(texts)
         """
-        self.classifier_wrapper.build_tokenizer(training_text)
+        self.classifier_wrapper.prepare_text_features(training_text)
+    
+    def prepare_text_features(self, training_text: np.ndarray) -> None:
+        """Prepare text features for the classifier.
+        
+        This method handles text preprocessing which could involve tokenization,
+        vectorization, or other approaches depending on the classifier type.
+        
+        Args:
+            training_text: Array of text strings to prepare features from
+            
+        Example:
+            >>> import numpy as np
+            >>> texts = np.array(["Hello world", "This is a test", "Another example"])
+            >>> classifier.prepare_text_features(texts)
+        """
+        self.classifier_wrapper.prepare_text_features(training_text)
     
     def build(
         self,
@@ -180,7 +195,7 @@ class torchTextClassifiers:
             if hasattr(self.config, 'categorical_vocabulary_sizes'):
                 self.config.categorical_vocabulary_sizes = list(categorical_vocabulary_sizes)
         
-        self.classifier_wrapper.build_tokenizer(training_text)
+        self.classifier_wrapper.prepare_text_features(training_text)
         self.classifier_wrapper._build_pytorch_model()
         
         if lightning:
@@ -265,7 +280,7 @@ class torchTextClassifiers:
             logger.info(f"Running on: {device}")
         
         # Build model if not already built
-        if self.classifier_wrapper.tokenizer is None or self.classifier_wrapper.pytorch_model is None:
+        if self.classifier_wrapper.pytorch_model is None:
             if verbose:
                 start = time.time()
                 logger.info("Building the model...")

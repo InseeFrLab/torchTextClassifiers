@@ -18,7 +18,7 @@ def test_wrapper_based_pattern():
     from torchTextClassifiers.classifiers.base import BaseClassifierWrapper, BaseClassifierConfig
     
     # Test that base classes exist and have expected structure
-    assert hasattr(BaseClassifierWrapper, 'build_tokenizer')
+    assert hasattr(BaseClassifierWrapper, 'prepare_text_features')
     assert hasattr(BaseClassifierWrapper, '_build_pytorch_model')
     assert hasattr(BaseClassifierWrapper, 'get_config_class')
     assert hasattr(BaseClassifierConfig, 'to_dict')
@@ -32,7 +32,8 @@ def test_class_structure():
     
     # Check that it has the expected methods defined
     assert hasattr(torchTextClassifiers, '__init__')
-    assert hasattr(torchTextClassifiers, 'build_tokenizer')
+    assert hasattr(torchTextClassifiers, 'build_tokenizer')  # backward compatibility
+    assert hasattr(torchTextClassifiers, 'prepare_text_features')  # new method
     assert hasattr(torchTextClassifiers, 'build')
     assert hasattr(torchTextClassifiers, 'train')
     assert hasattr(torchTextClassifiers, 'predict')
@@ -168,7 +169,7 @@ def test_error_handling_patterns():
 @pytest.mark.parametrize("method_name,expected_args", [
     ("predict", ["X"]),
     ("validate", ["X", "Y"]),
-    ("build_tokenizer", ["training_text"]),
+    ("prepare_text_features", ["training_text"]),
 ])
 def test_wrapper_method_signatures(method_name, expected_args):
     """Test that wrapper methods have expected signatures."""

@@ -12,6 +12,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from torchTextClassifiers import create_fasttext
 from torchTextClassifiers.utilities.preprocess import clean_text_feature
+from torchTextClassifiers import torchTextClassifiers
+from torchTextClassifiers.classifiers.simple_text_classifier import SimpleTextWrapper, SimpleTextConfig
 import time
 
 def stratified_split_rare_labels(X, y, test_size=0.2, min_train_samples=1):
@@ -80,7 +82,7 @@ def load_and_prepare_data():
     return X_text_only, X_mixed, y, encoder
     
 
-def train_and_evaluate_model(X, y, model_name, use_categorical=False):
+def train_and_evaluate_model(X, y, model_name, use_categorical=False, use_simple=False):
     """Train and evaluate a FastText model"""
     print(f"\n🎯 Training {model_name}...")
     
@@ -93,6 +95,48 @@ def train_and_evaluate_model(X, y, model_name, use_categorical=False):
         X_temp, y_temp, test_size=0.5  # Split temp 50/50 into validation and test
     )
     
+    if use_simple:
+        start_time = time.time()
+
+        simple_text_config = SimpleTextConfig(
+            hidden_dim=128,
+            num_classes=5,
+            max_features=5000,
+            learning_rate=1e-3,
+            dropout_rate=0.2
+        )
+        wrapper = SimpleTextWrapper(simple_text_config)
+        classifier = torchTextClassifiers(wrapper)
+        print(f"Classifier type: {type(classifier.classifier_wrapper).__name__}")
+        print(f"Uses tokenizer: {hasattr(classifier.classifier_wrapper, 'tokenizer')}")
+        print(f"Uses vectorizer: {hasattr(classifier.classifier_wrapper, 'vectorizer')}")
+        
+        # Build the model (this will use TF-IDF vectorization instead of tokenization)
+        print("\n🔨 Building model with TF-IDF preprocessing...")
+        classifier.build(X_train, y_train)
+        print("✅ Model built successfully!")
+        print(f"TF-IDF features: {len(classifier.classifier_wrapper.vectorizer.get_feature_names_out())}")
+        
+        # Train the model
+        print("\n🎯 Training model...")
+        classifier.train(
+            X_train, y_train, X_val, y_val,
+            num_epochs=10,
+            batch_size=4,
+            patience_train=3,
+            verbose=True
+        )
+        training_time = time.time() - start_time
+        accuracy = classifier.validate(X_test, y_test)
+        print(f"Test accuracy: {accuracy:.3f}")
+
+        return {
+            'model_name': model_name,
+            'test_accuracy': accuracy,
+            'training_time': training_time,
+            'classifier': classifier
+        }
+
     # Model parameters
     if use_categorical:
         # For mixed model - get vocabulary sizes from data
@@ -213,6 +257,9 @@ def main():
     results_mixed = train_and_evaluate_model(
         X_mixed, y, "Mixed Features FastText", use_categorical=True
     )
+
+    # TF-IDF classifier
+    results_tfidf = train_and_evaluate_model(X_text_only, y, "TF-IDF classifier", use_categorical=False, use_simple=True)
     
     # Compare results
     print(f"\n📊 Results Comparison:")
@@ -223,7 +270,8 @@ def main():
           f"{results_text_only['test_accuracy']:<11.3f} {results_text_only['training_time']:<10.1f}")
     print(f"{'Mixed Features':<25} "
           f"{results_mixed['test_accuracy']:<11.3f} {results_mixed['training_time']:<10.1f}")
-    
+    print(f"{'TF-IDF':<25} "
+          f"{results_tfidf['test_accuracy']:<11.3f} {results_tfidf['training_time']:<10.1f}")
     # Calculate improvements
     acc_improvement = results_mixed['test_accuracy'] - results_text_only['test_accuracy']
     time_overhead = results_mixed['training_time'] - results_text_only['training_time']

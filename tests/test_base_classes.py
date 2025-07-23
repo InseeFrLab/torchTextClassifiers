@@ -65,8 +65,8 @@ class TestBaseClassifierWrapper:
         """Test that concrete implementations can be initialized."""
         
         class ConcreteWrapper(BaseClassifierWrapper):
-            def build_tokenizer(self, training_text):
-                self.tokenizer = "mock_tokenizer"
+            def prepare_text_features(self, training_text):
+                pass  # Mock implementation
             
             def _build_pytorch_model(self):
                 self.pytorch_model = "mock_model"
@@ -98,7 +98,6 @@ class TestBaseClassifierWrapper:
         
         # Test initialization
         assert wrapper.config == mock_config
-        assert wrapper.tokenizer is None
         assert wrapper.pytorch_model is None
         assert wrapper.lightning_module is None
         assert wrapper.trained == False
@@ -108,8 +107,8 @@ class TestBaseClassifierWrapper:
         """Test that concrete implementations can use all methods."""
         
         class ConcreteWrapper(BaseClassifierWrapper):
-            def build_tokenizer(self, training_text):
-                self.tokenizer = f"tokenizer_for_{len(training_text)}_samples"
+            def prepare_text_features(self, training_text):
+                pass  # Mock implementation
             
             def _build_pytorch_model(self):
                 self.pytorch_model = "pytorch_model"
@@ -149,10 +148,10 @@ class TestBaseClassifierWrapper:
         mock_config = Mock()
         wrapper = ConcreteWrapper(mock_config)
         
-        # Test build_tokenizer
+        # Test prepare_text_features
         sample_texts = np.array(["text1", "text2", "text3"])
-        wrapper.build_tokenizer(sample_texts)
-        assert wrapper.tokenizer == "tokenizer_for_3_samples"
+        wrapper.prepare_text_features(sample_texts)
+        # Mock implementation doesn't set anything, so just test it doesn't crash
         
         # Test _build_pytorch_model
         wrapper._build_pytorch_model()
@@ -201,7 +200,7 @@ class TestBaseClassifierWrapper:
         """Test that incomplete implementations cannot be instantiated."""
         
         class IncompleteWrapper(BaseClassifierWrapper):
-            def build_tokenizer(self, training_text):
+            def prepare_text_features(self, training_text):
                 pass
             
             def _build_pytorch_model(self):
@@ -223,7 +222,7 @@ class TestBaseClassifierWrapper:
         """Test that abstract methods have correct signatures."""
         
         class ConcreteWrapper(BaseClassifierWrapper):
-            def build_tokenizer(self, training_text: np.ndarray) -> None:
+            def prepare_text_features(self, training_text: np.ndarray) -> None:
                 pass
             
             def _build_pytorch_model(self) -> None:

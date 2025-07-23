@@ -1,22 +1,24 @@
 # torchTextClassifiers
 
-A unified, extensible framework for text classification using PyTorch and PyTorch Lightning.
+A unified, extensible framework for text classification built on [PyTorch](https://pytorch.org/) and [PyTorch Lightning](https://lightning.ai/docs/pytorch/stable/).
+
+
 
 ## 🚀 Features
 
-- **Unified API**: Consistent interface for different classifier types
-- **FastText Support**: Built-in FastText classifier implementation
+- **Unified API**: Consistent interface for different classifier wrappers
+- **Extensible**: Easy to add new classifier implementations through wrapper pattern
+- **FastText Support**: Built-in FastText classifier with n-gram tokenization
+- **Flexible Preprocessing**: Each classifier can implement its own text preprocessing approach
 - **PyTorch Lightning**: Automated training with callbacks, early stopping, and logging
-- **Mixed Features**: Support for both text and categorical features
-- **Extensible**: Easy to add new classifier types
-- **Production Ready**: Model serialization, validation, and inference
+
 
 ## 📦 Installation
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-repo/torch-fastText.git
-cd torch-fastText
+git clone https://github.com/InseeFrLab/torchTextClassifiers.git
+cd torchtextClassifiers
 
 # Install with uv (recommended)
 uv sync
@@ -82,38 +84,34 @@ accuracy = classifier.validate(X_test, np.array([1]))
 print(f"Accuracy: {accuracy:.3f}")
 ```
 
-### Working with Mixed Features (Text + Categorical)
+### Custom Classifier Implementation
 
 ```python
 import numpy as np
-from torchTextClassifiers import create_fasttext
+from torchTextClassifiers import torchTextClassifiers
+from torchTextClassifiers.classifiers.simple_text_classifier import SimpleTextWrapper, SimpleTextConfig
 
-# Text data with categorical features
-X_train = np.column_stack([
-    np.array(["Great product!", "Terrible service", "Love it!"]),  # Text
-    np.array([[1, 2], [2, 1], [1, 3]])  # Categorical features
-])
-y_train = np.array([1, 0, 1])
-
-# Create classifier with categorical support
-classifier = create_fasttext(
-    embedding_dim=50,
-    sparse=False,
-    num_tokens=5000,
-    min_count=1,
-    min_n=3,
-    max_n=6,
-    len_word_ngrams=2,
+# Example: TF-IDF based classifier (alternative to tokenization)
+config = SimpleTextConfig(
+    hidden_dim=128,
     num_classes=2,
-    categorical_vocabulary_sizes=[3, 4],  # Vocab sizes for categorical features
-    categorical_embedding_dims=[10, 10]   # Embedding dims for categorical features
+    max_features=5000,
+    learning_rate=1e-3,
+    dropout_rate=0.2
 )
 
-# Build and train as usual
+# Create classifier with TF-IDF preprocessing
+wrapper = SimpleTextWrapper(config)
+classifier = torchTextClassifiers(wrapper)
+
+# Text data
+X_train = np.array(["Great product!", "Terrible service", "Love it!"])
+y_train = np.array([1, 0, 1])
+
+# Build and train
 classifier.build(X_train, y_train)
 # ... continue with training
 ```
-
 
 
 ## 🔧 Advanced Usage
@@ -121,8 +119,9 @@ classifier.build(X_train, y_train)
 ### Custom Configuration
 
 ```python
-from torchTextClassifiers import torchTextClassifiers, ClassifierType
+from torchTextClassifiers import torchTextClassifiers
 from torchTextClassifiers.classifiers.fasttext.config import FastTextConfig
+from torchTextClassifiers.classifiers.fasttext.wrapper import FastTextWrapper
 
 # Create custom configuration
 config = FastTextConfig(
@@ -138,7 +137,8 @@ config = FastTextConfig(
 )
 
 # Create classifier with custom config
-classifier = torchTextClassifiers(ClassifierType.FASTTEXT, config)
+wrapper = FastTextWrapper(config)
+classifier = torchTextClassifiers(wrapper)
 ```
 
 ### Using Pre-trained Tokenizers
@@ -189,19 +189,18 @@ classifier.train(
 The main classifier class providing a unified interface.
 
 **Key Methods:**
-- `build(X_train, y_train)`: Build tokenizer and model
+- `build(X_train, y_train)`: Build text preprocessing and model
 - `train(X_train, y_train, X_val, y_val, ...)`: Train the model
 - `predict(X)`: Make predictions
 - `validate(X, Y)`: Evaluate on test data
 - `to_json(filepath)`: Save configuration
 - `from_json(filepath)`: Load configuration
 
-#### `ClassifierType`
-Enumeration of supported classifier types.
-- `FASTTEXT`: FastText classifier
+#### `BaseClassifierWrapper`
+Base class for all classifier wrappers. Each classifier implementation extends this class.
 
-#### `ClassifierFactory`
-Factory for creating classifier instances.
+#### `FastTextWrapper`
+Wrapper for FastText classifier implementation with tokenization-based preprocessing.
 
 ### FastText Specific
 
@@ -222,24 +221,25 @@ Create FastText classifier from existing tokenizer.
 
 ## 🏗️ Architecture
 
-The framework follows a modular architecture:
+The framework follows a wrapper-based architecture:
 
 ```
 torchTextClassifiers/
 ├── torchTextClassifiers.py      # Main classifier interface
 ├── classifiers/
-│   ├── base.py                  # Abstract base classes
-│   └── fasttext/                # FastText implementation
-│       ├── config.py            # Configuration
-│       ├── wrapper.py           # Classifier wrapper
-│       ├── factory.py           # Convenience methods
-│       ├── tokenizer.py         # N-gram tokenizer
-│       ├── pytorch_model.py     # PyTorch model
-│       ├── lightning_module.py  # Lightning module
-│       └── dataset.py           # Dataset implementation
+│   ├── base.py                  # Abstract base wrapper classes
+│   ├── fasttext/                # FastText implementation
+│   │   ├── config.py            # Configuration
+│   │   ├── wrapper.py           # FastText wrapper (tokenization)
+│   │   ├── factory.py           # Convenience methods
+│   │   ├── tokenizer.py         # N-gram tokenizer
+│   │   ├── pytorch_model.py     # PyTorch model
+│   │   ├── lightning_module.py  # Lightning module
+│   │   └── dataset.py           # Dataset implementation
+│   └── simple_text_classifier.py # Example TF-IDF wrapper
 ├── utilities/
 │   └── checkers.py              # Input validation utilities
-└── factories.py                 # Generic factory system
+└── factories.py                 # Convenience factory functions
 ```
 
 ## 🔬 Testing
