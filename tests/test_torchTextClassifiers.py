@@ -5,57 +5,11 @@ from unittest.mock import Mock, patch, MagicMock
 import tempfile
 import os
 
-from torchTextClassifiers.torchTextClassifiers import (
-    torchTextClassifiers, 
-    ClassifierType, 
-    ClassifierFactory
-)
+from torchTextClassifiers.torchTextClassifiers import torchTextClassifiers
 from torchTextClassifiers.classifiers.fasttext.core import FastTextConfig, FastTextFactory
 from torchTextClassifiers.classifiers.fasttext.wrapper import FastTextWrapper
 
 
-class TestClassifierType:
-    """Test the ClassifierType enum."""
-    
-    def test_fasttext_type_exists(self):
-        """Test that FASTTEXT type is available."""
-        assert ClassifierType.FASTTEXT.value == "fasttext"
-
-
-class TestClassifierFactory:
-    """Test the ClassifierFactory class."""
-    
-    def test_create_fasttext_classifier(self, fasttext_config):
-        """Test creating FastText classifier through factory."""
-        classifier = ClassifierFactory.create_classifier(
-            ClassifierType.FASTTEXT, fasttext_config
-        )
-        assert isinstance(classifier, FastTextWrapper)
-        assert classifier.config == fasttext_config
-    
-    def test_create_unsupported_classifier(self, fasttext_config):
-        """Test creating unsupported classifier type raises error."""
-        with pytest.raises(ValueError, match="Unsupported classifier type"):
-            # Create a mock classifier type that doesn't exist
-            mock_type = Mock()
-            mock_type.name = "UNSUPPORTED"
-            ClassifierFactory.create_classifier(mock_type, fasttext_config)
-    
-    def test_register_new_classifier(self, fasttext_config):
-        """Test registering a new classifier type."""
-        # Create a mock classifier type and wrapper
-        mock_type = Mock()
-        mock_wrapper_class = Mock()
-        mock_wrapper_instance = Mock()
-        mock_wrapper_class.return_value = mock_wrapper_instance
-        
-        # Register the new classifier
-        ClassifierFactory.register_classifier(mock_type, mock_wrapper_class)
-        
-        # Test that it can be created
-        result = ClassifierFactory.create_classifier(mock_type, fasttext_config)
-        assert result == mock_wrapper_instance
-        mock_wrapper_class.assert_called_once_with(fasttext_config)
 
 
 class TestTorchTextClassifiers:
@@ -63,11 +17,12 @@ class TestTorchTextClassifiers:
     
     def test_initialization(self, fasttext_config):
         """Test basic initialization."""
-        classifier = torchTextClassifiers(ClassifierType.FASTTEXT, fasttext_config)
+        wrapper = FastTextWrapper(fasttext_config)
+        classifier = torchTextClassifiers(wrapper)
         
-        assert classifier.classifier_type == ClassifierType.FASTTEXT
         assert classifier.config == fasttext_config
         assert isinstance(classifier.classifier_wrapper, FastTextWrapper)
+        assert classifier.classifier_wrapper is wrapper
     
     def test_create_fasttext_classmethod(self):
         """Test the create_fasttext class method."""
@@ -82,7 +37,7 @@ class TestTorchTextClassifiers:
             num_classes=3
         )
         
-        assert classifier.classifier_type == ClassifierType.FASTTEXT
+        assert isinstance(classifier.classifier_wrapper, FastTextWrapper)
         assert classifier.config.embedding_dim == 50
         assert classifier.config.sparse == True
         assert classifier.config.num_tokens == 5000
@@ -97,7 +52,7 @@ class TestTorchTextClassifiers:
             sparse=False
         )
         
-        assert classifier.classifier_type == ClassifierType.FASTTEXT
+        assert isinstance(classifier.classifier_wrapper, FastTextWrapper)
         assert classifier.config.embedding_dim == 100
         assert classifier.config.num_classes == 2
         assert classifier.classifier_wrapper.tokenizer == mock_tokenizer
@@ -124,7 +79,8 @@ class TestTorchTextClassifiers:
         """Test build_tokenizer method."""
         mock_check_X.return_value = (sample_text_data, None, True)
         
-        classifier = torchTextClassifiers(ClassifierType.FASTTEXT, fasttext_config)
+        wrapper = FastTextWrapper(fasttext_config)
+        classifier = torchTextClassifiers(wrapper)
         classifier.classifier_wrapper.build_tokenizer = Mock()
         
         classifier.build_tokenizer(sample_text_data)
@@ -139,7 +95,8 @@ class TestTorchTextClassifiers:
         mock_check_X.return_value = (sample_text_data, None, True)
         mock_check_Y.return_value = sample_labels
         
-        classifier = torchTextClassifiers(ClassifierType.FASTTEXT, fasttext_config)
+        wrapper = FastTextWrapper(fasttext_config)
+        classifier = torchTextClassifiers(wrapper)
         classifier.classifier_wrapper.build_tokenizer = Mock()
         classifier.classifier_wrapper._build_pytorch_model = Mock()
         classifier.classifier_wrapper._check_and_init_lightning = Mock()
@@ -166,7 +123,8 @@ class TestTorchTextClassifiers:
             num_classes=3  # Pre-set
         )
         
-        classifier = torchTextClassifiers(ClassifierType.FASTTEXT, config)
+        wrapper = FastTextWrapper(config)
+        classifier = torchTextClassifiers(wrapper)
         classifier.classifier_wrapper.build_tokenizer = Mock()
         classifier.classifier_wrapper._build_pytorch_model = Mock()
         classifier.classifier_wrapper._check_and_init_lightning = Mock()
@@ -184,7 +142,8 @@ class TestTorchTextClassifiers:
         # Config without num_classes
         fasttext_config.num_classes = None
         
-        classifier = torchTextClassifiers(ClassifierType.FASTTEXT, fasttext_config)
+        wrapper = FastTextWrapper(fasttext_config)
+        classifier = torchTextClassifiers(wrapper)
         
         with pytest.raises(ValueError, match="Either num_classes must be provided"):
             classifier.build(sample_text_data, y_train=None)
@@ -199,7 +158,8 @@ class TestTorchTextClassifiers:
         invalid_labels = np.array([0, 1, 5])  # Max value 5 but only 3 unique values, so num_classes=3 but max=5
         mock_check_Y.return_value = invalid_labels
         
-        classifier = torchTextClassifiers(ClassifierType.FASTTEXT, fasttext_config)
+        wrapper = FastTextWrapper(fasttext_config)
+        classifier = torchTextClassifiers(wrapper)
         
         with pytest.raises(ValueError, match="y_train must contain values between 0 and num_classes-1"):
             classifier.build(sample_text_data, invalid_labels)
@@ -220,7 +180,8 @@ class TestTorchTextClassifiers:
         mock_trainer.checkpoint_callback.best_model_path = "/fake/path"
         mock_trainer_class.return_value = mock_trainer
         
-        classifier = torchTextClassifiers(ClassifierType.FASTTEXT, fasttext_config)
+        wrapper = FastTextWrapper(fasttext_config)
+        classifier = torchTextClassifiers(wrapper)
         
         # Mock wrapper methods
         classifier.classifier_wrapper.create_dataset = Mock(return_value=mock_dataset)
@@ -251,7 +212,8 @@ class TestTorchTextClassifiers:
     
     def test_predict_method(self, fasttext_config, sample_text_data):
         """Test predict method."""
-        classifier = torchTextClassifiers(ClassifierType.FASTTEXT, fasttext_config)
+        wrapper = FastTextWrapper(fasttext_config)
+        classifier = torchTextClassifiers(wrapper)
         classifier.classifier_wrapper.predict = Mock(return_value=np.array([1, 0, 1]))
         
         result = classifier.predict(sample_text_data)
@@ -261,7 +223,8 @@ class TestTorchTextClassifiers:
     
     def test_validate_method(self, fasttext_config, sample_text_data, sample_labels):
         """Test validate method."""
-        classifier = torchTextClassifiers(ClassifierType.FASTTEXT, fasttext_config)
+        wrapper = FastTextWrapper(fasttext_config)
+        classifier = torchTextClassifiers(wrapper)
         classifier.classifier_wrapper.validate = Mock(return_value=0.85)
         
         result = classifier.validate(sample_text_data, sample_labels)
@@ -271,7 +234,8 @@ class TestTorchTextClassifiers:
     
     def test_predict_and_explain_method(self, fasttext_config, sample_text_data):
         """Test predict_and_explain method."""
-        classifier = torchTextClassifiers(ClassifierType.FASTTEXT, fasttext_config)
+        wrapper = FastTextWrapper(fasttext_config)
+        classifier = torchTextClassifiers(wrapper)
         expected_predictions = np.array([1, 0, 1])
         expected_explanations = np.array([0.8, 0.2, 0.9])
         classifier.classifier_wrapper.predict_and_explain = Mock(
@@ -291,7 +255,8 @@ class TestTorchTextClassifiers:
         class MockWrapperWithoutExplain:
             pass
         
-        classifier = torchTextClassifiers(ClassifierType.FASTTEXT, fasttext_config)
+        wrapper = FastTextWrapper(fasttext_config)
+        classifier = torchTextClassifiers(wrapper)
         classifier.classifier_wrapper = MockWrapperWithoutExplain()
         
         with pytest.raises(NotImplementedError, match="Explanation not supported"):
@@ -299,7 +264,8 @@ class TestTorchTextClassifiers:
     
     def test_to_json_method(self, fasttext_config):
         """Test to_json serialization method."""
-        classifier = torchTextClassifiers(ClassifierType.FASTTEXT, fasttext_config)
+        wrapper = FastTextWrapper(fasttext_config)
+        classifier = torchTextClassifiers(wrapper)
         
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
             temp_path = f.name
@@ -313,7 +279,7 @@ class TestTorchTextClassifiers:
             with open(temp_path, 'r') as f:
                 data = json.load(f)
             
-            assert data['classifier_type'] == 'fasttext'
+            assert 'wrapper_class_info' in data
             assert 'config' in data
             assert data['config']['embedding_dim'] == fasttext_config.embedding_dim
             
@@ -324,7 +290,8 @@ class TestTorchTextClassifiers:
     def test_from_json_method(self, fasttext_config):
         """Test from_json deserialization method."""
         # First create a JSON file
-        original_classifier = torchTextClassifiers(ClassifierType.FASTTEXT, fasttext_config)
+        wrapper = FastTextWrapper(fasttext_config)
+        original_classifier = torchTextClassifiers(wrapper)
         
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
             temp_path = f.name
@@ -335,7 +302,7 @@ class TestTorchTextClassifiers:
             # Load from JSON
             loaded_classifier = torchTextClassifiers.from_json(temp_path)
             
-            assert loaded_classifier.classifier_type == ClassifierType.FASTTEXT
+            assert isinstance(loaded_classifier.classifier_wrapper, FastTextWrapper)
             assert loaded_classifier.config.embedding_dim == fasttext_config.embedding_dim
             assert loaded_classifier.config.sparse == fasttext_config.sparse
             assert loaded_classifier.config.num_tokens == fasttext_config.num_tokens
@@ -344,12 +311,12 @@ class TestTorchTextClassifiers:
             if os.path.exists(temp_path):
                 os.unlink(temp_path)
     
-    def test_from_json_unsupported_type(self):
-        """Test from_json with unsupported classifier type."""
-        # Create a JSON with unsupported type
+    def test_from_json_missing_wrapper_info(self):
+        """Test from_json with missing wrapper class info."""
+        # Create a JSON without wrapper_class_info
         fake_data = {
-            "classifier_type": "unsupported_type",
-            "config": {"some": "config"}
+            "config": {"embedding_dim": 50, "sparse": False, "num_tokens": 1000,
+                      "min_count": 1, "min_n": 3, "max_n": 6, "len_word_ngrams": 2}
         }
         
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
@@ -357,8 +324,30 @@ class TestTorchTextClassifiers:
             temp_path = f.name
         
         try:
-            with pytest.raises(ValueError, match="Unsupported classifier type"):
+            with pytest.raises(ValueError, match="No wrapper_class_info found"):
                 torchTextClassifiers.from_json(temp_path)
+        finally:
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
+    
+    def test_from_json_with_explicit_wrapper_class(self, fasttext_config):
+        """Test from_json with explicitly provided wrapper class."""
+        # First create a JSON file
+        wrapper = FastTextWrapper(fasttext_config)
+        original_classifier = torchTextClassifiers(wrapper)
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            temp_path = f.name
+        
+        try:
+            original_classifier.to_json(temp_path)
+            
+            # Load from JSON with explicit wrapper class
+            loaded_classifier = torchTextClassifiers.from_json(temp_path, FastTextWrapper)
+            
+            assert isinstance(loaded_classifier.classifier_wrapper, FastTextWrapper)
+            assert loaded_classifier.config.embedding_dim == fasttext_config.embedding_dim
+            
         finally:
             if os.path.exists(temp_path):
                 os.unlink(temp_path)

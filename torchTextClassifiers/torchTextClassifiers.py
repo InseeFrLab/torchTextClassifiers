@@ -2,7 +2,6 @@ import logging
 import time
 import json
 from typing import Optional, Union, Type, List, Dict, Any
-from enum import Enum
 
 import numpy as np
 import pytorch_lightning as pl
@@ -15,7 +14,6 @@ from pytorch_lightning.callbacks import (
 
 from .utilities.checkers import check_X, check_Y, NumpyJSONEncoder
 from .classifiers.base import BaseClassifierConfig, BaseClassifierWrapper
-from .factories import create_config_from_dict
 
 
 logger = logging.getLogger(__name__)
@@ -28,126 +26,6 @@ logging.basicConfig(
 )
 
 
-class ClassifierType(Enum):
-    """Enumeration of supported classifier types.
-    
-    This enum defines the available classifier types that can be used
-    with the torchTextClassifiers framework. Each type corresponds to
-    a specific implementation with its own configuration and wrapper.
-    
-    Attributes:
-        FASTTEXT: FastText-based text classifier for efficient text classification
-        
-    Example:
-        >>> from torchTextClassifiers import ClassifierType
-        >>> classifier_type = ClassifierType.FASTTEXT
-        >>> print(classifier_type.value)
-        'fasttext'
-    """
-    FASTTEXT = "fasttext"
-    # Add more classifier types here as needed
-    # BERT = "bert"
-    # LSTM = "lstm"
-    # CNN = "cnn"
-
-
-
-
-class ClassifierFactory:
-    """Factory class for creating and managing classifier wrappers.
-    
-    This factory implements a registry pattern that allows for dynamic loading
-    and creation of different classifier types. It supports both automatic
-    registration of built-in classifiers and manual registration of custom
-    classifier implementations.
-    
-    The factory uses lazy loading, attempting to import and register classifier
-    modules only when they are first requested.
-    
-    Attributes:
-        _registry: Dictionary mapping ClassifierType to wrapper class implementations
-        
-    Example:
-        >>> from torchTextClassifiers import ClassifierFactory, ClassifierType
-        >>> from torchTextClassifiers.classifiers.fasttext.config import FastTextConfig
-        >>> config = FastTextConfig(embedding_dim=100, num_tokens=1000, ...)
-        >>> wrapper = ClassifierFactory.create_classifier(ClassifierType.FASTTEXT, config)
-    """
-    
-    _registry: Dict[ClassifierType, Type[BaseClassifierWrapper]] = {}
-    
-    @classmethod
-    def create_classifier(cls, classifier_type: ClassifierType, config: BaseClassifierConfig) -> BaseClassifierWrapper:
-        """Create a classifier wrapper instance.
-        
-        This method creates a classifier wrapper of the specified type using the
-        provided configuration. If the classifier type is not yet registered,
-        it attempts to load the corresponding module dynamically.
-        
-        Args:
-            classifier_type: The type of classifier to create
-            config: Configuration object for the classifier
-            
-        Returns:
-            BaseClassifierWrapper: Initialized classifier wrapper instance
-            
-        Raises:
-            ValueError: If the classifier type is not supported or cannot be loaded
-            
-        Example:
-            >>> config = FastTextConfig(embedding_dim=50, num_tokens=5000)
-            >>> classifier = ClassifierFactory.create_classifier(
-            ...     ClassifierType.FASTTEXT, config
-            ... )
-        """
-        if classifier_type not in cls._registry:
-            # Try to load the classifier module dynamically
-            cls._try_load_classifier(classifier_type)
-            
-        if classifier_type not in cls._registry:
-            raise ValueError(f"Unsupported classifier type: {classifier_type}")
-        
-        wrapper_class = cls._registry[classifier_type]
-        return wrapper_class(config)
-    
-    @classmethod
-    def register_classifier(cls, classifier_type: ClassifierType, wrapper_class: Type[BaseClassifierWrapper]):
-        """Register a new classifier type with its wrapper class.
-        
-        This method allows registration of custom classifier implementations
-        that can then be used through the factory pattern.
-        
-        Args:
-            classifier_type: The classifier type enum value
-            wrapper_class: The wrapper class that implements BaseClassifierWrapper
-            
-        Example:
-            >>> class MyCustomWrapper(BaseClassifierWrapper):
-            ...     # Implementation here
-            ...     pass
-            >>> ClassifierFactory.register_classifier(
-            ...     ClassifierType.CUSTOM, MyCustomWrapper
-            ... )
-        """
-        cls._registry[classifier_type] = wrapper_class
-    
-    @classmethod
-    def _try_load_classifier(cls, classifier_type: ClassifierType):
-        """Attempt to dynamically load and register a classifier module.
-        
-        This method implements lazy loading for built-in classifier types.
-        It tries to import the corresponding wrapper module and register
-        it automatically.
-        
-        Args:
-            classifier_type: The classifier type to attempt loading
-        """
-        if classifier_type == ClassifierType.FASTTEXT:
-            try:
-                from .classifiers.fasttext.wrapper import FastTextWrapper
-                cls.register_classifier(ClassifierType.FASTTEXT, FastTextWrapper)
-            except ImportError:
-                pass  # Module not available
 
 
 class torchTextClassifiers:
@@ -164,13 +42,13 @@ class torchTextClassifiers:
     - Model serialization and loading
     
     Attributes:
-        classifier_type: The type of classifier being used
         config: Configuration object specific to the classifier type
         classifier_wrapper: The underlying classifier implementation
         
     Example:
-        >>> from torchTextClassifiers import torchTextClassifiers, ClassifierType
+        >>> from torchTextClassifiers import torchTextClassifiers
         >>> from torchTextClassifiers.classifiers.fasttext.config import FastTextConfig
+        >>> from torchTextClassifiers.classifiers.fasttext.wrapper import FastTextWrapper
         >>> 
         >>> # Create configuration
         >>> config = FastTextConfig(
@@ -183,8 +61,9 @@ class torchTextClassifiers:
         ...     num_classes=2
         ... )
         >>> 
-        >>> # Initialize classifier
-        >>> classifier = torchTextClassifiers(ClassifierType.FASTTEXT, config)
+        >>> # Initialize classifier with wrapper
+        >>> wrapper = FastTextWrapper(config)
+        >>> classifier = torchTextClassifiers(wrapper)
         >>> 
         >>> # Build and train
         >>> classifier.build(X_train, y_train)
@@ -194,34 +73,22 @@ class torchTextClassifiers:
         >>> predictions = classifier.predict(X_test)
     """
     
-    def __init__(self, classifier_type: ClassifierType, config: BaseClassifierConfig):
+    def __init__(self, classifier_wrapper: BaseClassifierWrapper):
         """Initialize the torchTextClassifiers instance.
         
         Args:
-            classifier_type: The type of classifier to create (e.g., ClassifierType.FASTTEXT)
-            config: Configuration object containing classifier-specific parameters
-            
-        Raises:
-            ValueError: If the classifier type is not supported
+            classifier_wrapper: An instance of a classifier wrapper that implements BaseClassifierWrapper
             
         Example:
+            >>> from torchTextClassifiers.classifiers.fasttext.wrapper import FastTextWrapper
+            >>> from torchTextClassifiers.classifiers.fasttext.config import FastTextConfig
             >>> config = FastTextConfig(embedding_dim=50, num_tokens=5000)
-            >>> classifier = torchTextClassifiers(ClassifierType.FASTTEXT, config)
+            >>> wrapper = FastTextWrapper(config)
+            >>> classifier = torchTextClassifiers(wrapper)
         """
-        self.classifier_type = classifier_type
-        self.config = config
-        self.classifier_wrapper: Optional[BaseClassifierWrapper] = None
-        self.__post_init__()
+        self.classifier_wrapper = classifier_wrapper
+        self.config = classifier_wrapper.config
     
-    def __post_init__(self):
-        """Initialize the classifier wrapper after instance creation.
-        
-        This method creates the appropriate classifier wrapper based on the
-        specified classifier type and configuration.
-        """
-        self.classifier_wrapper = ClassifierFactory.create_classifier(
-            self.classifier_type, self.config
-        )
     
     def build_tokenizer(self, training_text: np.ndarray) -> None:
         """Build tokenizer from training text data.
@@ -540,14 +407,15 @@ class torchTextClassifiers:
         if hasattr(self.classifier_wrapper, 'predict_and_explain'):
             return self.classifier_wrapper.predict_and_explain(X, **kwargs)
         else:
-            raise NotImplementedError(f"Explanation not supported for {self.classifier_type}")
+            raise NotImplementedError(f"Explanation not supported for {type(self.classifier_wrapper).__name__}")
     
     def to_json(self, filepath: str) -> None:
         """Save classifier configuration to JSON file.
         
-        This method serializes the classifier type and configuration to a JSON
-        file, allowing the classifier to be recreated later with from_json().
-        Note: This only saves configuration, not trained model weights.
+        This method serializes the classifier configuration to a JSON
+        file. Note: This only saves configuration, not trained model weights.
+        Custom classifier wrappers should implement a class method `get_wrapper_class_info()`
+        that returns a dict with 'module' and 'class_name' keys for proper reconstruction.
         
         Args:
             filepath: Path where to save the JSON configuration file
@@ -557,13 +425,23 @@ class torchTextClassifiers:
         """
         with open(filepath, "w") as f:
             data = {
-                "classifier_type": self.classifier_type.value,
                 "config": self.config.to_dict(),
             }
+            
+            # Try to get wrapper class info for reconstruction
+            if hasattr(self.classifier_wrapper.__class__, 'get_wrapper_class_info'):
+                data["wrapper_class_info"] = self.classifier_wrapper.__class__.get_wrapper_class_info()
+            else:
+                # Fallback: store module and class name
+                data["wrapper_class_info"] = {
+                    "module": self.classifier_wrapper.__class__.__module__,
+                    "class_name": self.classifier_wrapper.__class__.__name__
+                }
+            
             json.dump(data, f, cls=NumpyJSONEncoder, indent=4)
     
     @classmethod
-    def from_json(cls, filepath: str) -> "torchTextClassifiers":
+    def from_json(cls, filepath: str, wrapper_class: Optional[Type[BaseClassifierWrapper]] = None) -> "torchTextClassifiers":
         """Load classifier configuration from JSON file.
         
         This method creates a new classifier instance from a previously saved
@@ -571,28 +449,46 @@ class torchTextClassifiers:
         
         Args:
             filepath: Path to the JSON configuration file
+            wrapper_class: Optional wrapper class to use. If not provided, will try to
+                          reconstruct from saved wrapper_class_info
             
         Returns:
             torchTextClassifiers: New classifier instance with loaded configuration
             
         Raises:
-            ValueError: If the classifier type in the file is not supported
+            ImportError: If the wrapper class cannot be imported
             FileNotFoundError: If the configuration file doesn't exist
             
         Example:
+            >>> # Using saved wrapper class info
             >>> classifier = torchTextClassifiers.from_json('my_classifier_config.json')
-            >>> # Now you need to build and train the classifier
-            >>> classifier.build(X_train, y_train)
+            >>> 
+            >>> # Or providing wrapper class explicitly
+            >>> from torchTextClassifiers.classifiers.fasttext.wrapper import FastTextWrapper
+            >>> classifier = torchTextClassifiers.from_json('config.json', FastTextWrapper)
         """
         with open(filepath, "r") as f:
             data = json.load(f)
         
-        try:
-            classifier_type = ClassifierType(data["classifier_type"])
-        except ValueError:
-            raise ValueError(f"Unsupported classifier type: {data['classifier_type']}")
+        if wrapper_class is None:
+            # Try to reconstruct wrapper class from saved info
+            if "wrapper_class_info" not in data:
+                raise ValueError("No wrapper_class_info found in config file and no wrapper_class provided")
+            
+            wrapper_info = data["wrapper_class_info"]
+            module_name = wrapper_info["module"]
+            class_name = wrapper_info["class_name"]
+            
+            # Dynamically import the wrapper class
+            import importlib
+            module = importlib.import_module(module_name)
+            wrapper_class = getattr(module, class_name)
         
-        # Use the generic config factory
-        config = create_config_from_dict(data["classifier_type"], data["config"])
+        # Reconstruct config using wrapper class's config class
+        config_class = wrapper_class.get_config_class()
+        config = config_class.from_dict(data["config"])
         
-        return cls(classifier_type, config)
+        # Create wrapper instance
+        wrapper = wrapper_class(config)
+        
+        return cls(wrapper)

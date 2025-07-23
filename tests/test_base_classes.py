@@ -88,6 +88,10 @@ class TestBaseClassifierWrapper:
             
             def load_best_model(self, checkpoint_path):
                 self.trained = True
+            
+            @classmethod
+            def get_config_class(cls):
+                return Mock
         
         mock_config = Mock()
         wrapper = ConcreteWrapper(mock_config)
@@ -137,6 +141,10 @@ class TestBaseClassifierWrapper:
             def load_best_model(self, checkpoint_path):
                 self.trained = True
                 self.pytorch_model = f"model_from_{checkpoint_path}"
+            
+            @classmethod
+            def get_config_class(cls):
+                return Mock
         
         mock_config = Mock()
         wrapper = ConcreteWrapper(mock_config)
@@ -238,6 +246,10 @@ class TestBaseClassifierWrapper:
             
             def load_best_model(self, checkpoint_path: str) -> None:
                 pass
+            
+            @classmethod
+            def get_config_class(cls):
+                return Mock
         
         # Should be able to instantiate with all methods implemented
         mock_config = Mock()

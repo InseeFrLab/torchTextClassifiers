@@ -18,7 +18,7 @@ import torch.nn.functional as F
 from torch import nn
 
 if TYPE_CHECKING:
-    from ...torchTextClassifiers import torchTextClassifiers, ClassifierType
+    from ...torchTextClassifiers import torchTextClassifiers
 
 
 # ============================================================================
@@ -158,7 +158,8 @@ class FastTextFactory:
             ...     num_classes=3
             ... )
         """
-        from ...torchTextClassifiers import torchTextClassifiers, ClassifierType
+        from ...torchTextClassifiers import torchTextClassifiers
+        from .wrapper import FastTextWrapper
         
         config = FastTextConfig(
             embedding_dim=embedding_dim,
@@ -170,7 +171,8 @@ class FastTextFactory:
             len_word_ngrams=len_word_ngrams,
             **kwargs
         )
-        return torchTextClassifiers(ClassifierType.FASTTEXT, config)
+        wrapper = FastTextWrapper(config)
+        return torchTextClassifiers(wrapper)
     
     @staticmethod
     def build_from_tokenizer(
@@ -213,7 +215,8 @@ class FastTextFactory:
             >>> # The classifier is ready for training without building
             >>> classifier.train(X_train, y_train, X_val, y_val, ...)
         """
-        from ...torchTextClassifiers import torchTextClassifiers, ClassifierType
+        from ...torchTextClassifiers import torchTextClassifiers
+        from .wrapper import FastTextWrapper
         
         # Ensure the tokenizer has required attributes
         required_attrs = ["min_count", "min_n", "max_n", "num_tokens", "word_ngrams"]
@@ -234,7 +237,8 @@ class FastTextFactory:
             **kwargs
         )
         
-        classifier = torchTextClassifiers(ClassifierType.FASTTEXT, config)
+        wrapper = FastTextWrapper(config)
+        classifier = torchTextClassifiers(wrapper)
         classifier.classifier_wrapper.tokenizer = tokenizer
         classifier.classifier_wrapper._build_pytorch_model()
         

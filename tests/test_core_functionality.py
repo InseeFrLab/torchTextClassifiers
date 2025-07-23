@@ -8,19 +8,21 @@ from unittest.mock import Mock, patch, MagicMock
 
 def test_basic_imports():
     """Test that core modules can be imported without torch dependencies."""
-    # Test that the enum can be imported
-    from torchTextClassifiers.torchTextClassifiers import ClassifierType
-    assert ClassifierType.FASTTEXT.value == "fasttext"
+    # Test that the main class can be imported
+    from torchTextClassifiers.torchTextClassifiers import torchTextClassifiers
+    assert torchTextClassifiers is not None
 
 
-def test_classifier_factory_pattern():
-    """Test the factory pattern logic without actual implementations."""
-    from torchTextClassifiers.torchTextClassifiers import ClassifierFactory
+def test_wrapper_based_pattern():
+    """Test the wrapper-based pattern without actual implementations."""
+    from torchTextClassifiers.classifiers.base import BaseClassifierWrapper, BaseClassifierConfig
     
-    # Test registry structure
-    assert hasattr(ClassifierFactory, '_registry')
-    assert hasattr(ClassifierFactory, 'create_classifier')
-    assert hasattr(ClassifierFactory, 'register_classifier')
+    # Test that base classes exist and have expected structure
+    assert hasattr(BaseClassifierWrapper, 'build_tokenizer')
+    assert hasattr(BaseClassifierWrapper, '_build_pytorch_model')
+    assert hasattr(BaseClassifierWrapper, 'get_config_class')
+    assert hasattr(BaseClassifierConfig, 'to_dict')
+    assert hasattr(BaseClassifierConfig, 'from_dict')
 
 
 def test_class_structure():
@@ -65,22 +67,19 @@ def test_utilities_import():
 
 def test_torchTextClassifiers_initialization_pattern():
     """Test the initialization pattern using mocks."""
-    from torchTextClassifiers.torchTextClassifiers import torchTextClassifiers, ClassifierType
+    from torchTextClassifiers.torchTextClassifiers import torchTextClassifiers
     
-    with patch('torchTextClassifiers.torchTextClassifiers.ClassifierFactory.create_classifier') as mock_create_classifier:
-        # Mock the factory
-        mock_wrapper = Mock()
-        mock_create_classifier.return_value = mock_wrapper
-        mock_config = Mock()
-        
-        # Create instance (this will call __post_init__)
-        classifier = torchTextClassifiers(ClassifierType.FASTTEXT, mock_config)
-        
-        # Verify factory was called correctly
-        mock_create_classifier.assert_called_once_with(
-            ClassifierType.FASTTEXT, mock_config
-        )
-        assert classifier.classifier_wrapper == mock_wrapper
+    # Mock wrapper with config
+    mock_wrapper = Mock()
+    mock_config = Mock()
+    mock_wrapper.config = mock_config
+    
+    # Create instance directly with wrapper
+    classifier = torchTextClassifiers(mock_wrapper)
+    
+    # Verify initialization
+    assert classifier.classifier_wrapper == mock_wrapper
+    assert classifier.config == mock_config
 
 
 def test_numpy_json_encoder():
@@ -106,7 +105,8 @@ def test_numpy_json_encoder():
 def test_create_fasttext_classmethod():
     """Test the create_fasttext class method through FastTextFactory."""
     from torchTextClassifiers.classifiers.fasttext.core import FastTextFactory
-    from torchTextClassifiers.torchTextClassifiers import torchTextClassifiers, ClassifierType
+    from torchTextClassifiers.torchTextClassifiers import torchTextClassifiers
+    from torchTextClassifiers.classifiers.fasttext.wrapper import FastTextWrapper
     
     # Just test that it creates a real instance and config properly
     result = FastTextFactory.create_fasttext(
@@ -122,7 +122,7 @@ def test_create_fasttext_classmethod():
     
     # Verify the result is a proper torchTextClassifiers instance
     assert isinstance(result, torchTextClassifiers)
-    assert result.classifier_type == ClassifierType.FASTTEXT
+    assert isinstance(result.classifier_wrapper, FastTextWrapper)
     assert result.config.embedding_dim == 50
     assert result.config.sparse == True
     assert result.config.num_tokens == 5000
@@ -130,7 +130,7 @@ def test_create_fasttext_classmethod():
 
 def test_method_delegation_pattern():
     """Test that the main class properly delegates to wrapper methods."""
-    from torchTextClassifiers.torchTextClassifiers import torchTextClassifiers, ClassifierType
+    from torchTextClassifiers.torchTextClassifiers import torchTextClassifiers
     
     # Create a mock instance
     classifier = Mock(spec=torchTextClassifiers)
@@ -151,16 +151,18 @@ def test_method_delegation_pattern():
 def test_error_handling_patterns():
     """Test expected error handling without actual implementation."""
     
-    # Test that unsupported classifier types raise appropriate errors
-    from torchTextClassifiers.torchTextClassifiers import ClassifierFactory
+    # Test that incomplete wrapper configurations raise appropriate errors
+    from torchTextClassifiers.torchTextClassifiers import torchTextClassifiers
     
-    mock_config = Mock()
-    fake_type = Mock()
-    fake_type.__str__ = Mock(return_value="FAKE_TYPE")
+    # Test with invalid wrapper (missing config attribute)
+    class InvalidWrapper:
+        pass
     
-    # This should raise ValueError for unsupported type
-    with pytest.raises(ValueError, match="Unsupported classifier type"):
-        ClassifierFactory.create_classifier(fake_type, mock_config)
+    invalid_wrapper = InvalidWrapper()
+    
+    # This should raise AttributeError for missing config
+    with pytest.raises(AttributeError):
+        torchTextClassifiers(invalid_wrapper)
 
 
 @pytest.mark.parametrize("method_name,expected_args", [

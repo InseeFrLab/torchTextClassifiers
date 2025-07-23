@@ -114,19 +114,7 @@ classifier.build(X_train, y_train)
 # ... continue with training
 ```
 
-### Model Persistence
 
-```python
-# Save configuration
-classifier.to_json('model_config.json')
-
-# Load configuration (creates new instance)
-new_classifier = torchTextClassifiers.from_json('model_config.json')
-
-# You'll need to retrain the loaded classifier
-new_classifier.build(X_train, y_train)
-new_classifier.train(X_train, y_train, X_val, y_val, ...)
-```
 
 ## 🔧 Advanced Usage
 

@@ -67,3 +67,9 @@ class BaseClassifierWrapper(ABC):
     def load_best_model(self, checkpoint_path: str) -> None:
         """Load best model from checkpoint."""
         pass
+    
+    @classmethod
+    @abstractmethod
+    def get_config_class(cls) -> Type[BaseClassifierConfig]:
+        """Return the configuration class for this wrapper."""
+        pass

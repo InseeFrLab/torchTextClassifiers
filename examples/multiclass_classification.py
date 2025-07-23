@@ -134,7 +134,7 @@ def main():
     from torchTextClassifiers import torchTextClassifiers
     loaded_classifier = torchTextClassifiers.from_json('multiclass_classifier_config.json')
     print("✅ Configuration loaded successfully!")
-    print(f"Loaded classifier type: {loaded_classifier.classifier_type}")
+    print(f"Loaded classifier wrapper: {type(loaded_classifier.classifier_wrapper).__name__}")
     print(f"Loaded num_classes: {loaded_classifier.config.num_classes}")
     
     print("\n🎉 Multi-class example completed successfully!")

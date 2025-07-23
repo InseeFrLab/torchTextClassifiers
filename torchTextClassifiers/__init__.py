@@ -41,7 +41,7 @@ Quick Start:
     >>> predictions = classifier.predict(np.array(["new text sample"]))
 """
 
-from .torchTextClassifiers import torchTextClassifiers, ClassifierType, ClassifierFactory
+from .torchTextClassifiers import torchTextClassifiers
 
 # Convenience imports for FastText
 try:
@@ -61,8 +61,6 @@ except ImportError:
 
 __all__ = [
     "torchTextClassifiers",
-    "ClassifierType", 
-    "ClassifierFactory",
     "create_fasttext",
     "build_fasttext_from_tokenizer",
 ]

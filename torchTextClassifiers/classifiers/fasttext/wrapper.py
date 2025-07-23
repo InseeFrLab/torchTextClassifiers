@@ -202,4 +202,9 @@ class FastTextWrapper(BaseClassifierWrapper):
         self.pytorch_model = self.lightning_module.model.to("cpu")
         self.trained = True
         self.pytorch_model.eval()
+    
+    @classmethod
+    def get_config_class(cls):
+        """Return the configuration class for FastText wrapper."""
+        return FastTextConfig
 
