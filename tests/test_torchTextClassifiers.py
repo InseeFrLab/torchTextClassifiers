@@ -21,8 +21,8 @@ class TestTorchTextClassifiers:
         classifier = torchTextClassifiers(wrapper)
         
         assert classifier.config == fasttext_config
-        assert isinstance(classifier.classifier_wrapper, FastTextWrapper)
-        assert classifier.classifier_wrapper is wrapper
+        assert isinstance(classifier.classifier, FastTextWrapper)
+        assert classifier.classifier is wrapper
     
     def test_create_fasttext_classmethod(self):
         """Test the create_fasttext class method."""
@@ -37,7 +37,7 @@ class TestTorchTextClassifiers:
             num_classes=3
         )
         
-        assert isinstance(classifier.classifier_wrapper, FastTextWrapper)
+        assert isinstance(classifier.classifier, FastTextWrapper)
         assert classifier.config.embedding_dim == 50
         assert classifier.config.sparse == True
         assert classifier.config.num_tokens == 5000
@@ -52,10 +52,10 @@ class TestTorchTextClassifiers:
             sparse=False
         )
         
-        assert isinstance(classifier.classifier_wrapper, FastTextWrapper)
+        assert isinstance(classifier.classifier, FastTextWrapper)
         assert classifier.config.embedding_dim == 100
         assert classifier.config.num_classes == 2
-        assert classifier.classifier_wrapper.tokenizer == mock_tokenizer
+        assert classifier.classifier.tokenizer == mock_tokenizer
     
     def test_build_from_tokenizer_missing_attributes(self):
         """Test build_from_tokenizer with tokenizer missing attributes."""
@@ -81,11 +81,11 @@ class TestTorchTextClassifiers:
         
         wrapper = FastTextWrapper(fasttext_config)
         classifier = torchTextClassifiers(wrapper)
-        classifier.classifier_wrapper.prepare_text_features = Mock()
+        classifier.classifier.prepare_text_features = Mock()
         
         classifier.build_tokenizer(sample_text_data)
         
-        classifier.classifier_wrapper.prepare_text_features.assert_called_once_with(sample_text_data)
+        classifier.classifier.prepare_text_features.assert_called_once_with(sample_text_data)
     
     @patch('torchTextClassifiers.torchTextClassifiers.check_X')
     @patch('torchTextClassifiers.torchTextClassifiers.check_Y')
@@ -97,16 +97,16 @@ class TestTorchTextClassifiers:
         
         wrapper = FastTextWrapper(fasttext_config)
         classifier = torchTextClassifiers(wrapper)
-        classifier.classifier_wrapper.prepare_text_features = Mock()
-        classifier.classifier_wrapper._build_pytorch_model = Mock()
-        classifier.classifier_wrapper._check_and_init_lightning = Mock()
+        classifier.classifier.prepare_text_features = Mock()
+        classifier.classifier._build_pytorch_model = Mock()
+        classifier.classifier._check_and_init_lightning = Mock()
         
         classifier.build(sample_text_data, sample_labels)
         
         # Verify methods were called
-        classifier.classifier_wrapper.prepare_text_features.assert_called_once()
-        classifier.classifier_wrapper._build_pytorch_model.assert_called_once()
-        classifier.classifier_wrapper._check_and_init_lightning.assert_called_once()
+        classifier.classifier.prepare_text_features.assert_called_once()
+        classifier.classifier._build_pytorch_model.assert_called_once()
+        classifier.classifier._check_and_init_lightning.assert_called_once()
         
         # Verify num_classes was updated
         assert classifier.config.num_classes == len(np.unique(sample_labels))
@@ -125,9 +125,9 @@ class TestTorchTextClassifiers:
         
         wrapper = FastTextWrapper(config)
         classifier = torchTextClassifiers(wrapper)
-        classifier.classifier_wrapper.prepare_text_features = Mock()
-        classifier.classifier_wrapper._build_pytorch_model = Mock()
-        classifier.classifier_wrapper._check_and_init_lightning = Mock()
+        classifier.classifier.prepare_text_features = Mock()
+        classifier.classifier._build_pytorch_model = Mock()
+        classifier.classifier._check_and_init_lightning = Mock()
         
         classifier.build(sample_text_data, y_train=None)
         
@@ -184,13 +184,13 @@ class TestTorchTextClassifiers:
         classifier = torchTextClassifiers(wrapper)
         
         # Mock wrapper methods
-        classifier.classifier_wrapper.create_dataset = Mock(return_value=mock_dataset)
-        classifier.classifier_wrapper.create_dataloader = Mock(return_value=mock_dataloader)
-        classifier.classifier_wrapper.load_best_model = Mock()
-        classifier.classifier_wrapper.tokenizer = Mock()  # Pretend it's built
-        classifier.classifier_wrapper.pytorch_model = Mock()
-        classifier.classifier_wrapper.pytorch_model.to = Mock(return_value=classifier.classifier_wrapper.pytorch_model)
-        classifier.classifier_wrapper.lightning_module = Mock()
+        classifier.classifier.create_dataset = Mock(return_value=mock_dataset)
+        classifier.classifier.create_dataloader = Mock(return_value=mock_dataloader)
+        classifier.classifier.load_best_model = Mock()
+        classifier.classifier.tokenizer = Mock()  # Pretend it's built
+        classifier.classifier.pytorch_model = Mock()
+        classifier.classifier.pytorch_model.to = Mock(return_value=classifier.classifier.pytorch_model)
+        classifier.classifier.lightning_module = Mock()
         
         # Call train
         classifier.train(
@@ -203,33 +203,33 @@ class TestTorchTextClassifiers:
         )
         
         # Verify dataset creation
-        assert classifier.classifier_wrapper.create_dataset.call_count == 2  # train + val
-        assert classifier.classifier_wrapper.create_dataloader.call_count == 2  # train + val
+        assert classifier.classifier.create_dataset.call_count == 2  # train + val
+        assert classifier.classifier.create_dataloader.call_count == 2  # train + val
         
         # Verify trainer was called
         mock_trainer.fit.assert_called_once()
-        classifier.classifier_wrapper.load_best_model.assert_called_once()
+        classifier.classifier.load_best_model.assert_called_once()
     
     def test_predict_method(self, fasttext_config, sample_text_data):
         """Test predict method."""
         wrapper = FastTextWrapper(fasttext_config)
         classifier = torchTextClassifiers(wrapper)
-        classifier.classifier_wrapper.predict = Mock(return_value=np.array([1, 0, 1]))
+        classifier.classifier.predict = Mock(return_value=np.array([1, 0, 1]))
         
         result = classifier.predict(sample_text_data)
         
-        classifier.classifier_wrapper.predict.assert_called_once_with(sample_text_data)
+        classifier.classifier.predict.assert_called_once_with(sample_text_data)
         np.testing.assert_array_equal(result, np.array([1, 0, 1]))
     
     def test_validate_method(self, fasttext_config, sample_text_data, sample_labels):
         """Test validate method."""
         wrapper = FastTextWrapper(fasttext_config)
         classifier = torchTextClassifiers(wrapper)
-        classifier.classifier_wrapper.validate = Mock(return_value=0.85)
+        classifier.classifier.validate = Mock(return_value=0.85)
         
         result = classifier.validate(sample_text_data, sample_labels)
         
-        classifier.classifier_wrapper.validate.assert_called_once_with(sample_text_data, sample_labels)
+        classifier.classifier.validate.assert_called_once_with(sample_text_data, sample_labels)
         assert result == 0.85
     
     def test_predict_and_explain_method(self, fasttext_config, sample_text_data):
@@ -238,13 +238,13 @@ class TestTorchTextClassifiers:
         classifier = torchTextClassifiers(wrapper)
         expected_predictions = np.array([1, 0, 1])
         expected_explanations = np.array([0.8, 0.2, 0.9])
-        classifier.classifier_wrapper.predict_and_explain = Mock(
+        classifier.classifier.predict_and_explain = Mock(
             return_value=(expected_predictions, expected_explanations)
         )
         
         predictions, explanations = classifier.predict_and_explain(sample_text_data)
         
-        classifier.classifier_wrapper.predict_and_explain.assert_called_once_with(sample_text_data)
+        classifier.classifier.predict_and_explain.assert_called_once_with(sample_text_data)
         np.testing.assert_array_equal(predictions, expected_predictions)
         np.testing.assert_array_equal(explanations, expected_explanations)
     
@@ -257,7 +257,7 @@ class TestTorchTextClassifiers:
         
         wrapper = FastTextWrapper(fasttext_config)
         classifier = torchTextClassifiers(wrapper)
-        classifier.classifier_wrapper = MockWrapperWithoutExplain()
+        classifier.classifier = MockWrapperWithoutExplain()
         
         with pytest.raises(NotImplementedError, match="Explanation not supported"):
             classifier.predict_and_explain(sample_text_data)
@@ -302,7 +302,7 @@ class TestTorchTextClassifiers:
             # Load from JSON
             loaded_classifier = torchTextClassifiers.from_json(temp_path)
             
-            assert isinstance(loaded_classifier.classifier_wrapper, FastTextWrapper)
+            assert isinstance(loaded_classifier.classifier, FastTextWrapper)
             assert loaded_classifier.config.embedding_dim == fasttext_config.embedding_dim
             assert loaded_classifier.config.sparse == fasttext_config.sparse
             assert loaded_classifier.config.num_tokens == fasttext_config.num_tokens
@@ -345,7 +345,7 @@ class TestTorchTextClassifiers:
             # Load from JSON with explicit wrapper class
             loaded_classifier = torchTextClassifiers.from_json(temp_path, FastTextWrapper)
             
-            assert isinstance(loaded_classifier.classifier_wrapper, FastTextWrapper)
+            assert isinstance(loaded_classifier.classifier, FastTextWrapper)
             assert loaded_classifier.config.embedding_dim == fasttext_config.embedding_dim
             
         finally:

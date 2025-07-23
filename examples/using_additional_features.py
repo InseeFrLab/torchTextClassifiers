@@ -107,15 +107,15 @@ def train_and_evaluate_model(X, y, model_name, use_categorical=False, use_simple
         )
         wrapper = SimpleTextWrapper(simple_text_config)
         classifier = torchTextClassifiers(wrapper)
-        print(f"Classifier type: {type(classifier.classifier_wrapper).__name__}")
-        print(f"Uses tokenizer: {hasattr(classifier.classifier_wrapper, 'tokenizer')}")
-        print(f"Uses vectorizer: {hasattr(classifier.classifier_wrapper, 'vectorizer')}")
+        print(f"Classifier type: {type(classifier.classifier).__name__}")
+        print(f"Uses tokenizer: {hasattr(classifier.classifier, 'tokenizer')}")
+        print(f"Uses vectorizer: {hasattr(classifier.classifier, 'vectorizer')}")
         
         # Build the model (this will use TF-IDF vectorization instead of tokenization)
         print("\n🔨 Building model with TF-IDF preprocessing...")
         classifier.build(X_train, y_train)
         print("✅ Model built successfully!")
-        print(f"TF-IDF features: {len(classifier.classifier_wrapper.vectorizer.get_feature_names_out())}")
+        print(f"TF-IDF features: {len(classifier.classifier.vectorizer.get_feature_names_out())}")
         
         # Train the model
         print("\n🎯 Training model...")

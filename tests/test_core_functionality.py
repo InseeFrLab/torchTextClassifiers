@@ -79,7 +79,7 @@ def test_torchTextClassifiers_initialization_pattern():
     classifier = torchTextClassifiers(mock_wrapper)
     
     # Verify initialization
-    assert classifier.classifier_wrapper == mock_wrapper
+    assert classifier.classifier == mock_wrapper
     assert classifier.config == mock_config
 
 
@@ -123,7 +123,7 @@ def test_create_fasttext_classmethod():
     
     # Verify the result is a proper torchTextClassifiers instance
     assert isinstance(result, torchTextClassifiers)
-    assert isinstance(result.classifier_wrapper, FastTextWrapper)
+    assert isinstance(result.classifier, FastTextWrapper)
     assert result.config.embedding_dim == 50
     assert result.config.sparse == True
     assert result.config.num_tokens == 5000
@@ -135,17 +135,17 @@ def test_method_delegation_pattern():
     
     # Create a mock instance
     classifier = Mock(spec=torchTextClassifiers)
-    classifier.classifier_wrapper = Mock()
+    classifier.classifier = Mock()
     
     # Test predict delegation
     expected_result = np.array([1, 0, 1])
-    classifier.classifier_wrapper.predict.return_value = expected_result
+    classifier.classifier.predict.return_value = expected_result
     
     # Apply the real predict method to our mock
     sample_X = np.array(["test1", "test2", "test3"])
     result = torchTextClassifiers.predict(classifier, sample_X)
     
-    classifier.classifier_wrapper.predict.assert_called_once_with(sample_X)
+    classifier.classifier.predict.assert_called_once_with(sample_X)
     assert result is expected_result
 
 

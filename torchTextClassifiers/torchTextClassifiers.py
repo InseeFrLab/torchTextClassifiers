@@ -43,7 +43,7 @@ class torchTextClassifiers:
     
     Attributes:
         config: Configuration object specific to the classifier type
-        classifier_wrapper: The underlying classifier implementation
+        classifier: The underlying classifier implementation
         
     Example:
         >>> from torchTextClassifiers import torchTextClassifiers
@@ -73,11 +73,11 @@ class torchTextClassifiers:
         >>> predictions = classifier.predict(X_test)
     """
     
-    def __init__(self, classifier_wrapper: BaseClassifierWrapper):
+    def __init__(self, classifier: BaseClassifierWrapper):
         """Initialize the torchTextClassifiers instance.
         
         Args:
-            classifier_wrapper: An instance of a classifier wrapper that implements BaseClassifierWrapper
+            classifier: An instance of a classifier wrapper that implements BaseClassifierWrapper
             
         Example:
             >>> from torchTextClassifiers.classifiers.fasttext.wrapper import FastTextWrapper
@@ -86,8 +86,8 @@ class torchTextClassifiers:
             >>> wrapper = FastTextWrapper(config)
             >>> classifier = torchTextClassifiers(wrapper)
         """
-        self.classifier_wrapper = classifier_wrapper
-        self.config = classifier_wrapper.config
+        self.classifier = classifier
+        self.config = classifier.config
     
     
     def build_tokenizer(self, training_text: np.ndarray) -> None:
@@ -104,7 +104,7 @@ class torchTextClassifiers:
             >>> texts = np.array(["Hello world", "This is a test", "Another example"])
             >>> classifier.build_tokenizer(texts)
         """
-        self.classifier_wrapper.prepare_text_features(training_text)
+        self.classifier.prepare_text_features(training_text)
     
     def prepare_text_features(self, training_text: np.ndarray) -> None:
         """Prepare text features for the classifier.
@@ -120,7 +120,7 @@ class torchTextClassifiers:
             >>> texts = np.array(["Hello world", "This is a test", "Another example"])
             >>> classifier.prepare_text_features(texts)
         """
-        self.classifier_wrapper.prepare_text_features(training_text)
+        self.classifier.prepare_text_features(training_text)
     
     def build(
         self,
@@ -195,11 +195,11 @@ class torchTextClassifiers:
             if hasattr(self.config, 'categorical_vocabulary_sizes'):
                 self.config.categorical_vocabulary_sizes = list(categorical_vocabulary_sizes)
         
-        self.classifier_wrapper.prepare_text_features(training_text)
-        self.classifier_wrapper._build_pytorch_model()
+        self.classifier.prepare_text_features(training_text)
+        self.classifier._build_pytorch_model()
         
         if lightning:
-            self.classifier_wrapper._check_and_init_lightning(**kwargs)
+            self.classifier._check_and_init_lightning(**kwargs)
     
     def train(
         self,
@@ -274,13 +274,13 @@ class torchTextClassifiers:
         else:
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
-        self.classifier_wrapper.device = device
+        self.classifier.device = device
         
         if verbose:
             logger.info(f"Running on: {device}")
         
         # Build model if not already built
-        if self.classifier_wrapper.pytorch_model is None:
+        if self.classifier.pytorch_model is None:
             if verbose:
                 start = time.time()
                 logger.info("Building the model...")
@@ -289,27 +289,27 @@ class torchTextClassifiers:
                 end = time.time()
                 logger.info(f"Model built in {end - start:.2f} seconds.")
         
-        self.classifier_wrapper.pytorch_model = self.classifier_wrapper.pytorch_model.to(device)
+        self.classifier.pytorch_model = self.classifier.pytorch_model.to(device)
         
         # Create datasets and dataloaders using wrapper methods
-        train_dataset = self.classifier_wrapper.create_dataset(
+        train_dataset = self.classifier.create_dataset(
             texts=training_text,
             labels=y_train,
             categorical_variables=train_categorical_variables,
         )
-        val_dataset = self.classifier_wrapper.create_dataset(
+        val_dataset = self.classifier.create_dataset(
             texts=val_text,
             labels=y_val,
             categorical_variables=val_categorical_variables,
         )
         
-        train_dataloader = self.classifier_wrapper.create_dataloader(
+        train_dataloader = self.classifier.create_dataloader(
             dataset=train_dataset,
             batch_size=batch_size,
             num_workers=num_workers,
             shuffle=True
         )
-        val_dataloader = self.classifier_wrapper.create_dataloader(
+        val_dataloader = self.classifier.create_dataloader(
             dataset=val_dataset,
             batch_size=batch_size,
             num_workers=num_workers,
@@ -353,7 +353,7 @@ class torchTextClassifiers:
             logger.info("Launching training...")
             start = time.time()
         
-        trainer.fit(self.classifier_wrapper.lightning_module, train_dataloader, val_dataloader)
+        trainer.fit(self.classifier.lightning_module, train_dataloader, val_dataloader)
         
         if verbose:
             end = time.time()
@@ -361,7 +361,7 @@ class torchTextClassifiers:
         
         # Load best model using wrapper method
         best_model_path = trainer.checkpoint_callback.best_model_path
-        self.classifier_wrapper.load_best_model(best_model_path)
+        self.classifier.load_best_model(best_model_path)
     
     def predict(self, X: np.ndarray, **kwargs) -> np.ndarray:
         """Make predictions on input data.
@@ -378,7 +378,7 @@ class torchTextClassifiers:
             >>> predictions = classifier.predict(X_test)
             >>> print(predictions)  # [0, 1]
         """
-        return self.classifier_wrapper.predict(X, **kwargs)
+        return self.classifier.predict(X, **kwargs)
     
     def validate(self, X: np.ndarray, Y: np.ndarray, **kwargs) -> float:
         """Validate the model on test data.
@@ -395,7 +395,7 @@ class torchTextClassifiers:
             >>> accuracy = classifier.validate(X_test, y_test)
             >>> print(f"Accuracy: {accuracy:.3f}")
         """
-        return self.classifier_wrapper.validate(X, Y, **kwargs)
+        return self.classifier.validate(X, Y, **kwargs)
     
     def predict_and_explain(self, X: np.ndarray, **kwargs):
         """Make predictions with explanations (if supported).
@@ -419,10 +419,10 @@ class torchTextClassifiers:
             >>> print(f"Predictions: {predictions}")
             >>> print(f"Explanations: {explanations}")
         """
-        if hasattr(self.classifier_wrapper, 'predict_and_explain'):
-            return self.classifier_wrapper.predict_and_explain(X, **kwargs)
+        if hasattr(self.classifier, 'predict_and_explain'):
+            return self.classifier.predict_and_explain(X, **kwargs)
         else:
-            raise NotImplementedError(f"Explanation not supported for {type(self.classifier_wrapper).__name__}")
+            raise NotImplementedError(f"Explanation not supported for {type(self.classifier).__name__}")
     
     def to_json(self, filepath: str) -> None:
         """Save classifier configuration to JSON file.
@@ -444,13 +444,13 @@ class torchTextClassifiers:
             }
             
             # Try to get wrapper class info for reconstruction
-            if hasattr(self.classifier_wrapper.__class__, 'get_wrapper_class_info'):
-                data["wrapper_class_info"] = self.classifier_wrapper.__class__.get_wrapper_class_info()
+            if hasattr(self.classifier.__class__, 'get_wrapper_class_info'):
+                data["wrapper_class_info"] = self.classifier.__class__.get_wrapper_class_info()
             else:
                 # Fallback: store module and class name
                 data["wrapper_class_info"] = {
-                    "module": self.classifier_wrapper.__class__.__module__,
-                    "class_name": self.classifier_wrapper.__class__.__name__
+                    "module": self.classifier.__class__.__module__,
+                    "class_name": self.classifier.__class__.__name__
                 }
             
             json.dump(data, f, cls=NumpyJSONEncoder, indent=4)

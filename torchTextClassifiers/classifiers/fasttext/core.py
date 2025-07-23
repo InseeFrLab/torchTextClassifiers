@@ -239,8 +239,8 @@ class FastTextFactory:
         
         wrapper = FastTextWrapper(config)
         classifier = torchTextClassifiers(wrapper)
-        classifier.classifier_wrapper.tokenizer = tokenizer
-        classifier.classifier_wrapper._build_pytorch_model()
+        classifier.classifier.tokenizer = tokenizer
+        classifier.classifier._build_pytorch_model()
         
         return classifier
     

@@ -2,8 +2,6 @@
 
 A unified, extensible framework for text classification built on [PyTorch](https://pytorch.org/) and [PyTorch Lightning](https://lightning.ai/docs/pytorch/stable/).
 
-
-
 ## 🚀 Features
 
 - **Unified API**: Consistent interface for different classifier wrappers
@@ -114,52 +112,6 @@ classifier.build(X_train, y_train)
 ```
 
 
-## 🔧 Advanced Usage
-
-### Custom Configuration
-
-```python
-from torchTextClassifiers import torchTextClassifiers
-from torchTextClassifiers.classifiers.fasttext.config import FastTextConfig
-from torchTextClassifiers.classifiers.fasttext.wrapper import FastTextWrapper
-
-# Create custom configuration
-config = FastTextConfig(
-    embedding_dim=200,
-    sparse=True,
-    num_tokens=20000,
-    min_count=3,
-    min_n=2,
-    max_n=8,
-    len_word_ngrams=3,
-    num_classes=5,
-    direct_bagging=False,  # Custom FastText parameter
-)
-
-# Create classifier with custom config
-wrapper = FastTextWrapper(config)
-classifier = torchTextClassifiers(wrapper)
-```
-
-### Using Pre-trained Tokenizers
-
-```python
-from torchTextClassifiers import build_fasttext_from_tokenizer
-
-# Assume you have a pre-trained tokenizer
-# my_tokenizer = ... (previously trained NGramTokenizer)
-
-classifier = build_fasttext_from_tokenizer(
-    tokenizer=my_tokenizer,
-    embedding_dim=100,
-    num_classes=3,
-    sparse=False
-)
-
-# Model and tokenizer are already built, ready for training
-classifier.train(X_train, y_train, X_val, y_val, ...)
-```
-
 ### Training Customization
 
 ```python
@@ -181,67 +133,6 @@ classifier.train(
 )
 ```
 
-## 📊 API Reference
-
-### Main Classes
-
-#### `torchTextClassifiers`
-The main classifier class providing a unified interface.
-
-**Key Methods:**
-- `build(X_train, y_train)`: Build text preprocessing and model
-- `train(X_train, y_train, X_val, y_val, ...)`: Train the model
-- `predict(X)`: Make predictions
-- `validate(X, Y)`: Evaluate on test data
-- `to_json(filepath)`: Save configuration
-- `from_json(filepath)`: Load configuration
-
-#### `BaseClassifierWrapper`
-Base class for all classifier wrappers. Each classifier implementation extends this class.
-
-#### `FastTextWrapper`
-Wrapper for FastText classifier implementation with tokenization-based preprocessing.
-
-### FastText Specific
-
-#### `create_fasttext(**kwargs)`
-Convenience function to create FastText classifiers.
-
-**Parameters:**
-- `embedding_dim`: Embedding dimension
-- `sparse`: Use sparse embeddings
-- `num_tokens`: Vocabulary size
-- `min_count`: Minimum token frequency
-- `min_n`, `max_n`: Character n-gram range
-- `len_word_ngrams`: Word n-gram length
-- `num_classes`: Number of output classes
-
-#### `build_fasttext_from_tokenizer(tokenizer, **kwargs)`
-Create FastText classifier from existing tokenizer.
-
-## 🏗️ Architecture
-
-The framework follows a wrapper-based architecture:
-
-```
-torchTextClassifiers/
-├── torchTextClassifiers.py      # Main classifier interface
-├── classifiers/
-│   ├── base.py                  # Abstract base wrapper classes
-│   ├── fasttext/                # FastText implementation
-│   │   ├── config.py            # Configuration
-│   │   ├── wrapper.py           # FastText wrapper (tokenization)
-│   │   ├── factory.py           # Convenience methods
-│   │   ├── tokenizer.py         # N-gram tokenizer
-│   │   ├── pytorch_model.py     # PyTorch model
-│   │   ├── lightning_module.py  # Lightning module
-│   │   └── dataset.py           # Dataset implementation
-│   └── simple_text_classifier.py # Example TF-IDF wrapper
-├── utilities/
-│   └── checkers.py              # Input validation utilities
-└── factories.py                 # Convenience factory functions
-```
-
 ## 🔬 Testing
 
 Run the test suite:
@@ -257,24 +148,6 @@ uv run pytest --cov=torchTextClassifiers
 uv run pytest tests/test_torchTextClassifiers.py -v
 ```
 
-## 🤝 Contributing
-
-We welcome contributions! See our [Developer Guide](docs/developer_guide.md) for information on:
-
-- Adding new classifier types
-- Code organization and patterns
-- Testing requirements
-- Documentation standards
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- Built with [PyTorch](https://pytorch.org/) and [PyTorch Lightning](https://lightning.ai/)
-- Inspired by [FastText](https://fasttext.cc/) for efficient text classification
-- Uses [uv](https://github.com/astral-sh/uv) for dependency management
 
 ## 📚 Examples
 
@@ -285,14 +158,8 @@ See the [examples/](examples/) directory for:
 - Custom classifier implementation
 - Advanced training configurations
 
-## 🐛 Support
 
-If you encounter any issues:
 
-1. Check the [examples](examples/) for similar use cases
-2. Review the API documentation above
-3. Open an issue on GitHub with:
-   - Python version
-   - Package versions (`uv tree` or `pip list`)
-   - Minimal reproduction code
-   - Error messages/stack traces
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
