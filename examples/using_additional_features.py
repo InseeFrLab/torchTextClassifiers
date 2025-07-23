@@ -12,7 +12,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from torchTextClassifiers import create_fasttext
 from torchTextClassifiers.utilities.preprocess import clean_text_feature
-
+import time
 
 def stratified_split_rare_labels(X, y, test_size=0.2, min_train_samples=1):
     # Get unique labels and their frequencies
@@ -56,7 +56,7 @@ def load_and_prepare_data():
     """Load and prepare data"""
     print("📊 Using AG news dataset sample for demonstration...")
     df = pd.read_parquet("https://minio.lab.sspcloud.fr/h4njlg/public/ag_news_full_1M.parquet")
-    df = df.sample(100000, random_state=42)  # Smaller sample to avoid disk space issues
+    df = df.sample(10000, random_state=42)  # Smaller sample to avoid disk space issues
     print(f"✅ Loaded {len(df)} samples from AG NEWS dataset")
     
     df['category_final'] = df['category'].apply(lambda x: merge_cat(x))
