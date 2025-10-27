@@ -13,14 +13,16 @@ from tokenizers import (
 )
 from transformers import PreTrainedTokenizerFast
 
-from torchTextClassifiers.tokenizers import BaseTokenizer
+from torchTextClassifiers.tokenizers import HuggingFaceTokenizer
 
 logger = logging.getLogger(__name__)
 
 
-class WordPieceTokenizer(BaseTokenizer):
+class WordPieceTokenizer(HuggingFaceTokenizer):
     def __init__(self, vocab_size: int, trained: bool = False):
         """Largely inspired by https://huggingface.co/learn/llm-course/chapter6/8"""
+
+        super().__init__(vocab_size)
 
         self.unk_token = "[UNK]"
         self.pad_token = "[PAD]"
@@ -56,14 +58,10 @@ class WordPieceTokenizer(BaseTokenizer):
             (self.sep_token, self.tokenizer.token_to_id(self.sep_token)),
         )
         self.tokenizer.decoder = decoders.WordPiece(prefix="##")
-        self.tokenizer.enable_padding(pad_id=self.tokenizer.token_to_id("[PAD]"), pad_token="[PAD]")
+        self.padding_idx = self.tokenizer.token_to_id("[PAD]")
+        self.tokenizer.enable_padding(pad_id=self.padding_idx, pad_token="[PAD]")
+
         self.tokenizer = PreTrainedTokenizerFast(tokenizer_object=self.tokenizer)
-
-    def tokenize(self, text: str) -> list:
-        if not self.trained:
-            raise RuntimeError("Tokenizer must be trained before tokenization.")
-
-        return self.tokenizer.encode(text).tokens
 
     def train(
         self, training_corpus: List[str], save_path: str = None, filesystem=None, s3_save_path=None
