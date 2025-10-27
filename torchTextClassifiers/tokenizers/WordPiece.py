@@ -62,6 +62,7 @@ class WordPieceTokenizer(HuggingFaceTokenizer):
         self.tokenizer.enable_padding(pad_id=self.padding_idx, pad_token="[PAD]")
 
         self.tokenizer = PreTrainedTokenizerFast(tokenizer_object=self.tokenizer)
+        self.vocab_size = len(self.tokenizer)
 
     def train(
         self, training_corpus: List[str], save_path: str = None, filesystem=None, s3_save_path=None
