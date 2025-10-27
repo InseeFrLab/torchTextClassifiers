@@ -17,7 +17,6 @@ class TextClassificationDataset(Dataset):
         categorical_variables: Union[List[List[int]], np.array, None],
         tokenizer: BaseTokenizer,
         labels: Union[List[int], None] = None,
-        **kwargs,
     ):
         self.categorical_variables = categorical_variables
 
@@ -79,9 +78,7 @@ class TextClassificationDataset(Dataset):
                 ]
             )
         else:
-            categorical_tensors = torch.empty(
-                len(text), 1, dtype=torch.float32, device=labels_tensor.device
-            )
+            categorical_tensors = None
 
         return {
             "input_ids": tokenize_output["input_ids"],
