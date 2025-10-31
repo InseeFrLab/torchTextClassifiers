@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import List, Union
 
 
 class BaseTokenizer(ABC):
@@ -6,7 +7,7 @@ class BaseTokenizer(ABC):
         self.vocab_size = vocab_size
 
     @abstractmethod
-    def tokenize(self, text: str) -> list:
+    def tokenize(self, text: Union[str, List[str]]) -> list:
         """Tokenizes the raw input text into a list of tokens."""
         pass
 
@@ -21,7 +22,7 @@ class HuggingFaceTokenizer(BaseTokenizer, ABC):
         self.trained = False
         self.tokenizer = None
 
-    def tokenize(self, text: str) -> list:
+    def tokenize(self, text: Union[str, List[str]]) -> list:
         if not self.trained:
             raise RuntimeError("Tokenizer must be trained before tokenization.")
 
