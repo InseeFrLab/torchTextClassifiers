@@ -1,0 +1,2 @@
+from .lightning import TextClassificationModule as TextClassificationModule
+from .model import TextClassificationModel as TextClassificationModel
