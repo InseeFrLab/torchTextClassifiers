@@ -18,7 +18,8 @@ try:
 except ImportError:
     HAS_CAPTUM = False
 
-from torchTextClassifiers.utilities.checkers import validate_categorical_inputs
+from torchTextClassifiers.model.categorical_var_net import CategoricalVariableNet, ForwardType
+from torchTextClassifiers.model.classification_heads import ClassificationHead
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +42,8 @@ class TextClassificationModel(nn.Module):
     def __init__(
         self,
         embedding_dim: int,
-        num_classes: int,
+        classification_head: ClassificationHead,
+        categorical_variable_net: CategoricalVariableNet = None,
         tokenizer=None,
         num_rows: int = None,
         categorical_vocabulary_sizes: List[int] = None,
@@ -63,27 +65,6 @@ class TextClassificationModel(nn.Module):
         """
         super().__init__()
 
-        if isinstance(categorical_embedding_dims, int):
-            # if provided categorical embedding dims is an int, average the categorical embeddings before concatenating to sentence embedding
-            self.average_cat_embed = True
-        else:
-            self.average_cat_embed = False
-
-        categorical_vocabulary_sizes, categorical_embedding_dims, num_categorical_features = (
-            validate_categorical_inputs(
-                categorical_vocabulary_sizes,
-                categorical_embedding_dims,
-                num_categorical_features=None,
-            )
-        )
-
-        assert (
-            isinstance(categorical_embedding_dims, list) or categorical_embedding_dims is None
-        ), "categorical_embedding_dims must be a list of int at this stage"
-
-        if categorical_embedding_dims is None:
-            self.average_cat_embed = False
-
         if tokenizer is None:
             if num_rows is None:
                 raise ValueError(
@@ -99,8 +80,6 @@ class TextClassificationModel(nn.Module):
                 num_rows = tokenizer.vocab_size
 
         self.num_rows = num_rows
-
-        self.num_classes = num_classes
         self.tokenizer = tokenizer
         self.padding_idx = self.tokenizer.padding_idx
         self.embedding_dim = embedding_dim
@@ -115,35 +94,9 @@ class TextClassificationModel(nn.Module):
             sparse=sparse,
         )
 
-        self.categorical_embedding_layers = {}
-
-        # Entry dim for the last layer:
-        #   1. embedding_dim if no categorical variables or summing the categrical embeddings to sentence embedding
-        #   2. embedding_dim + cat_embedding_dim if averaging the categorical embeddings before concatenating to sentence embedding (categorical_embedding_dims is a int)
-        #   3. embedding_dim + sum(categorical_embedding_dims) if concatenating individually the categorical embeddings to sentence embedding (no averaging, categorical_embedding_dims is a list)
-        dim_in_last_layer = embedding_dim
-        if self.average_cat_embed:
-            dim_in_last_layer += categorical_embedding_dims[0]
-
-        if categorical_vocabulary_sizes is not None:
-            self.categorical_variables = True
-            for var_idx, num_rows in enumerate(categorical_vocabulary_sizes):
-                if categorical_embedding_dims is not None:
-                    emb = nn.Embedding(
-                        embedding_dim=categorical_embedding_dims[var_idx], num_embeddings=num_rows
-                    )  # concatenate to sentence embedding
-                    if not self.average_cat_embed:
-                        dim_in_last_layer += categorical_embedding_dims[var_idx]
-                else:
-                    emb = nn.Embedding(
-                        embedding_dim=embedding_dim, num_embeddings=num_rows
-                    )  # sum to sentence embedding
-                self.categorical_embedding_layers[var_idx] = emb
-                setattr(self, "emb_{}".format(var_idx), emb)
-        else:
-            self.categorical_variables = False
-
-        self.fc = nn.Linear(dim_in_last_layer, num_classes)
+        self.classification_head = classification_head
+        self.categorical_variable_net = categorical_variable_net
+        self.num_classes = self.classification_head.num_classes
 
     def _get_sentence_embedding(
         self, token_embeddings: torch.Tensor, attention_mask: torch.Tensor
@@ -197,44 +150,21 @@ class TextClassificationModel(nn.Module):
             token_embeddings=token_embeddings, attention_mask=attention_mask
         )
 
-        # Handle categorical variables efficiently
-        if self.categorical_variables and categorical_vars.numel() > 0:
-            cat_embeds = []
-            # Process categorical embeddings in batch
-            for i, (_, embed_layer) in enumerate(self.categorical_embedding_layers.items()):
-                cat_input = categorical_vars[:, i].long()
+        if self.categorical_variable_net:
+            x_cat = self.categorical_variable_net(categorical_vars)
 
-                # Check if categorical values are within valid range
-                vocab_size = embed_layer.num_embeddings
-                max_val = cat_input.max().item()
-                min_val = cat_input.min().item()
-
-                if max_val >= vocab_size or min_val < 0:
-                    raise ValueError(
-                        f"Categorical feature {i}: values range [{min_val}, {max_val}] exceed vocabulary size {vocab_size}."
-                    )
-
-                cat_embed = embed_layer(cat_input)
-                if cat_embed.dim() > 2:
-                    cat_embed = cat_embed.squeeze(1)
-                cat_embeds.append(cat_embed)
-
-            if self.categorical_embedding_dims is not None:
-                if self.average_cat_embed:
-                    # Stack and average in one operation
-                    x_cat = torch.stack(cat_embeds, dim=0).mean(dim=0)
-                    x_combined = torch.cat([x_text, x_cat], dim=1)
-                else:
-                    # Optimize concatenation
-                    x_combined = torch.cat([x_text] + cat_embeds, dim=1)
+            if (
+                self.categorical_variable_net.forward_type == ForwardType.AVERAGE_AND_CONCAT
+                or self.categorical_variable_net.forward_type == ForwardType.CONCATENATE_ALL
+            ):
+                x_combined = torch.cat((x_text, x_cat), dim=1)
             else:
-                # Sum embeddings efficiently
-                x_combined = x_text + torch.stack(cat_embeds, dim=0).sum(dim=0)
-        else:
-            x_combined = x_text
+                assert self.categorical_variable_net.forward_type == ForwardType.SUM_TO_TEXT
+                x_combined = x_text + x_cat
 
-        # Final linear layer
-        return self.fc(x_combined)
+        logits = self.classification_head(x_combined)
+
+        return logits
 
     @torch.no_grad()
     def predict(
