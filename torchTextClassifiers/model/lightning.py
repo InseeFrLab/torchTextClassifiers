@@ -124,7 +124,7 @@ class TextClassificationModule(pl.LightningModule):
 
         return loss, accuracy
 
-    def predict_step(self, batch, batch_idx: int, dataloader_idx: int = 0):
+    def predict_step(self, batch, batch_idx: int = 0, dataloader_idx: int = 0):
         """
         Prediction step.
 
