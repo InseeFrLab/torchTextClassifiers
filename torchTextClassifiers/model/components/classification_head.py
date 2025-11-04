@@ -1,9 +1,16 @@
+from typing import Optional
+
 import torch
 from torch import nn
 
 
 class ClassificationHead(nn.Module):
-    def __init__(self, input_dim=None, num_classes=None, net=None):
+    def __init__(
+        self,
+        input_dim: Optional[int] = None,
+        num_classes: Optional[int] = None,
+        net: Optional[nn.Module] = None,
+    ):
         super().__init__()
         if net is not None:
             self.net = net

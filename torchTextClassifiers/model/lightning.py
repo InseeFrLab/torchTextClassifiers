@@ -57,7 +57,7 @@ class TextClassificationModule(pl.LightningModule):
         Returns (torch.Tensor): Prediction.
         """
         return self.model(
-            encoded_text=batch["input_ids"],
+            input_ids=batch["input_ids"],
             attention_mask=batch["attention_mask"],
             categorical_vars=batch.get("categorical_vars", None),
         )
