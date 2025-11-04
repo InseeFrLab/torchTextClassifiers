@@ -5,7 +5,7 @@ import torch
 from torch import nn
 
 
-class ForwardType(Enum):
+class CategoricalForwardType(Enum):
     SUM_TO_TEXT = "EMBEDDING_SUM_TO_TEXT"
     AVERAGE_AND_CONCAT = "EMBEDDING_AVERAGE_AND_CONCAT"
     CONCATENATE_ALL = "EMBEDDING_CONCATENATE_ALL"
@@ -25,6 +25,10 @@ class CategoricalVariableNet(nn.Module):
         self.text_embedding_dim = text_embedding_dim
 
         self._validate_categorical_inputs()
+        assert isinstance(
+            self.forward_type, CategoricalForwardType
+        ), "forward_type must be set after validation"
+        assert isinstance(self.output_dim, int), "output_dim must be set as int after validation"
 
         self.categorical_embedding_layers = {}
 
@@ -38,11 +42,11 @@ class CategoricalVariableNet(nn.Module):
 
     def forward(self, categorical_vars_tensor: torch.Tensor) -> torch.Tensor:
         cat_embeds = self._get_cat_embeds(categorical_vars_tensor)
-        if self.forward_type == ForwardType.SUM_TO_TEXT:
+        if self.forward_type == CategoricalForwardType.SUM_TO_TEXT:
             x_combined = torch.stack(cat_embeds, dim=0).sum(dim=0)  # (bs, text_embed_dim)
-        elif self.forward_type == ForwardType.AVERAGE_AND_CONCAT:
+        elif self.forward_type == CategoricalForwardType.AVERAGE_AND_CONCAT:
             x_combined = torch.stack(cat_embeds, dim=0).mean(dim=0)  # (bs, embed_dim)
-        elif self.forward_type == ForwardType.CONCATENATE_ALL:
+        elif self.forward_type == CategoricalForwardType.CONCATENATE_ALL:
             x_combined = torch.cat(cat_embeds, dim=1)  # (bs, sum of all cat embed dims)
         else:
             raise ValueError(f"Unknown forward type: {self.forward_type}")
@@ -55,6 +59,8 @@ class CategoricalVariableNet(nn.Module):
         return x_combined
 
     def _get_cat_embeds(self, categorical_vars_tensor: torch.Tensor):
+        if categorical_vars_tensor.dtype != torch.long:
+            categorical_vars_tensor = categorical_vars_tensor.to(torch.long)
         cat_embeds = []
 
         for i, embed_layer in self.categorical_embedding_layers.items():
@@ -95,12 +101,12 @@ class CategoricalVariableNet(nn.Module):
         # "Transform" embedding dims into a suitable list, or stay None
         if categorical_embedding_dims is not None:
             if isinstance(categorical_embedding_dims, int):
-                self.forward_type = ForwardType.AVERAGE_AND_CONCAT
+                self.forward_type = CategoricalForwardType.AVERAGE_AND_CONCAT
                 self.output_dim = categorical_embedding_dims
                 categorical_embedding_dims = [categorical_embedding_dims] * num_categorical_features
 
             elif isinstance(categorical_embedding_dims, list):
-                self.forward_type = ForwardType.CONCATENATE_ALL
+                self.forward_type = CategoricalForwardType.CONCATENATE_ALL
                 self.output_dim = sum(categorical_embedding_dims)
             else:
                 raise TypeError("categorical_embedding_dims must be an int, a list of int or None")
@@ -109,7 +115,7 @@ class CategoricalVariableNet(nn.Module):
                 raise ValueError(
                     "If categorical_embedding_dims is None, text_embedding_dim must be provided"
                 )
-            self.forward_type = ForwardType.SUM_TO_TEXT
+            self.forward_type = CategoricalForwardType.SUM_TO_TEXT
             self.output_dim = self.text_embedding_dim
             categorical_embedding_dims = [self.text_embedding_dim] * num_categorical_features
 
