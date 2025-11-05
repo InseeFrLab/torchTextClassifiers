@@ -146,6 +146,9 @@ class TextClassificationModule(pl.LightningModule):
         """
         optimizer = self.optimizer(self.parameters(), **self.optimizer_params)
 
+        if self.scheduler is None:
+            return optimizer
+
         # Only use scheduler if it's not ReduceLROnPlateau or if we can ensure val_loss is available
         # For complex training setups, sometimes val_loss is not available every epoch
         if hasattr(self.scheduler, "__name__") and "ReduceLROnPlateau" in self.scheduler.__name__:
