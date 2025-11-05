@@ -24,6 +24,7 @@ class BaseTokenizer(ABC):
 
         self.vocab_size = vocab_size
         self.output_vectorized = output_vectorized
+        self.output_dim = output_dim
         if self.output_vectorized:
             if output_dim is None:
                 raise ValueError(
@@ -40,9 +41,9 @@ class BaseTokenizer(ABC):
 
 
 class HuggingFaceTokenizer(BaseTokenizer, ABC):
-    def __init__(self, vocab_size: int):
+    def __init__(self, vocab_size: int, output_dim: Optional[int] = None):
         super().__init__(
-            vocab_size, output_vectorized=False
+            vocab_size, output_vectorized=False, output_dim=output_dim
         )  # it outputs token ids and not vectors
 
         self.trained = False
@@ -52,8 +53,14 @@ class HuggingFaceTokenizer(BaseTokenizer, ABC):
         if not self.trained:
             raise RuntimeError("Tokenizer must be trained before tokenization.")
 
+        # Pad to longest sequence if no output_dim is specified
+        padding = True if self.output_dim is None else "max_length"
+
         return self.tokenizer(
-            text, padding=True, return_tensors="pt"
+            text,
+            padding=padding,
+            return_tensors="pt",
+            max_length=self.output_dim,
         )  # method from PreTrainedTokenizerFast
 
     @classmethod
