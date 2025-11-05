@@ -1,19 +1,22 @@
-import pytest
+from unittest.mock import Mock
+
 import numpy as np
-from unittest.mock import Mock, MagicMock
+import pytest
 
 
 @pytest.fixture
 def sample_text_data():
     """Sample text data for testing."""
-    return np.array([
-        "This is a positive example",
-        "This is a negative example", 
-        "Another positive case",
-        "Another negative case",
-        "Good example here",
-        "Bad example here"
-    ])
+    return np.array(
+        [
+            "This is a positive example",
+            "This is a negative example",
+            "Another positive case",
+            "Another negative case",
+            "Good example here",
+            "Bad example here",
+        ]
+    )
 
 
 @pytest.fixture
@@ -25,14 +28,7 @@ def sample_labels():
 @pytest.fixture
 def sample_categorical_data():
     """Sample categorical data for testing."""
-    return np.array([
-        [1, 2],
-        [2, 1], 
-        [1, 3],
-        [3, 1],
-        [2, 2],
-        [3, 3]
-    ])
+    return np.array([[1, 2], [2, 1], [1, 3], [3, 1], [2, 2], [3, 3]])
 
 
 @pytest.fixture
@@ -48,33 +44,32 @@ def sample_X_text_only(sample_text_data):
 
 
 @pytest.fixture
-def fasttext_config():
-    """Mock FastText configuration."""
-    from torchTextClassifiers.classifiers.fasttext.core import FastTextConfig
-    
-    config = FastTextConfig(
+def model_config():
+    """Mock model configuration."""
+    from torchTextClassifiers import ModelConfig
+
+    config = ModelConfig(
         embedding_dim=10,
-        sparse=False,
-        num_tokens=1000,
-        min_count=1,
-        min_n=3,
-        max_n=6,
-        len_word_ngrams=2,
-        num_classes=2
+        categorical_vocabulary_sizes=[4, 5],
+        categorical_embedding_dims=[3, 4],
+        num_classes=10,
     )
     return config
 
 
 @pytest.fixture
 def mock_tokenizer():
-    """Mock NGramTokenizer for testing."""
+    """Mock BaseTokenizer for testing."""
     tokenizer = Mock()
-    tokenizer.min_count = 1
-    tokenizer.min_n = 3
-    tokenizer.max_n = 6
-    tokenizer.num_tokens = 1000
-    tokenizer.word_ngrams = 2
-    tokenizer.padding_index = 999
+    tokenizer.vocab_size = 1000
+    tokenizer.padding_idx = 1
+    tokenizer.tokenize = Mock(
+        return_value={
+            "input_ids": np.array([[1, 2, 3], [4, 5, 6]]),
+            "attention_mask": np.array([[1, 1, 1], [1, 1, 1]]),
+        }
+    )
+    tokenizer.output_dim = 50
     return tokenizer
 
 
