@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import List
+from typing import List, Optional
 
 from torchTextClassifiers.tokenizers import HAS_HF, HuggingFaceTokenizer
 
@@ -24,10 +24,10 @@ logger = logging.getLogger(__name__)
 
 
 class WordPieceTokenizer(HuggingFaceTokenizer):
-    def __init__(self, vocab_size: int, trained: bool = False):
+    def __init__(self, vocab_size: int, trained: bool = False, output_dim: Optional[int] = None):
         """Largely inspired by https://huggingface.co/learn/llm-course/chapter6/8"""
 
-        super().__init__(vocab_size)
+        super().__init__(vocab_size=vocab_size, output_dim=output_dim)
 
         self.unk_token = "[UNK]"
         self.pad_token = "[PAD]"
@@ -40,6 +40,7 @@ class WordPieceTokenizer(HuggingFaceTokenizer):
             self.sep_token,
         ]
         self.vocab_size = vocab_size
+        self.context_size = output_dim
 
         self.tokenizer = Tokenizer(models.WordPiece(unk_token=self.unk_token))
 
