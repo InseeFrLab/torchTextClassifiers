@@ -6,17 +6,10 @@ lightning_module.py, and dataset.py.
 """
 
 import logging
-from typing import Annotated, List, Optional
+from typing import Annotated, Optional
 
 import torch
 from torch import nn
-
-try:
-    from captum.attr import LayerIntegratedGradients
-
-    HAS_CAPTUM = True
-except ImportError:
-    HAS_CAPTUM = False
 
 from torchTextClassifiers.model.components import (
     CategoricalForwardType,
@@ -37,6 +30,9 @@ logging.basicConfig(
 
 # ============================================================================
 # PyTorch Model
+
+# It takes PyTorch tensors as input (not raw text!),
+# and it outputs raw not-softmaxed logits, not predictions
 # ============================================================================
 
 
@@ -149,90 +145,3 @@ class TextClassificationModel(nn.Module):
         logits = self.classification_head(x_combined)
 
         return logits
-
-    # TODO: move to the wrapper class
-    # We should not have anything relating to tokenization in the model class
-    # A PyTorch model takes preocessed tensors as input not raw text,
-    # and it outputs raw logits, not predictions
-    @torch.no_grad()
-    def predict(
-        self,
-        text: List[str],
-        categorical_variables: List[List[int]] = None,
-        top_k=1,
-        explain=False,
-    ):
-        """
-        Args:
-            text (List[str]): A list of text observations.
-            params (Optional[Dict[str, Any]]): Additional parameters to
-                pass to the model for inference.
-            top_k (int): for each sentence, return the top_k most likely predictions (default: 1)
-            explain (bool): launch gradient integration to have an explanation of the prediction (default: False)
-            preprocess (bool): If True, preprocess text. Needs unidecode library.
-
-        Returns:
-        if explain is False:
-            predictions (torch.Tensor, shape (len(text), top_k)): A tensor containing the top_k most likely codes to the query.
-            confidence (torch.Tensor, shape (len(text), top_k)): A tensor array containing the corresponding confidence scores.
-        if explain is True:
-            predictions (torch.Tensor, shape (len(text), top_k)): Containing the top_k most likely codes to the query.
-            confidence (torch.Tensor, shape (len(text), top_k)): Corresponding confidence scores.
-            all_attributions (torch.Tensor, shape (len(text), top_k, seq_len)): A tensor containing the attributions for each token in the text.
-            x (torch.Tensor): A tensor containing the token indices of the text.
-            id_to_token_dicts (List[Dict[int, str]]): A list of dictionaries mapping token indices to tokens (one for each sentence).
-            token_to_id_dicts (List[Dict[str, int]]): A list of dictionaries mapping tokens to token indices: the reverse of those in id_to_token_dicts.
-            text (list[str]): A plist containing the preprocessed text (one line for each sentence).
-        """
-
-        if explain:
-            if not HAS_CAPTUM:
-                raise ImportError(
-                    "Captum is not installed and is required for explainability. Run 'pip install/uv add torchFastText[explainability]'."
-                )
-            lig = LayerIntegratedGradients(
-                self, self.embeddings
-            )  # initialize a Captum layer gradient integrator
-
-        self.eval()
-
-        tokenize_output = self.tokenizer.tokenize(text)
-
-        encoded_text = tokenize_output["input_ids"]  # (batch_size, seq_len)
-        attention_mask = tokenize_output["attention_mask"]  # (batch_size, seq_len)
-
-        if categorical_variables is not None:
-            categorical_vars = torch.tensor(
-                categorical_variables, dtype=torch.float32
-            )  # (batch_size, num_categorical_features)
-        else:
-            categorical_vars = torch.empty((encoded_text.shape[0], 0), dtype=torch.float32)
-
-        pred = self(
-            encoded_text, attention_mask, categorical_vars
-        )  # forward pass, contains the prediction scores (len(text), num_classes)
-        label_scores = pred.detach().cpu()
-        label_scores_topk = torch.topk(label_scores, k=top_k, dim=1)
-
-        predictions = label_scores_topk.indices  # get the top_k most likely predictions
-        confidence = torch.round(label_scores_topk.values, decimals=2)  # and their scores
-
-        if explain:
-            all_attributions = []
-            for k in range(top_k):
-                attributions = lig.attribute(
-                    (encoded_text, attention_mask, categorical_vars),
-                    target=torch.Tensor(predictions[:, k]).long(),
-                )  # (batch_size, seq_len)
-                attributions = attributions.sum(dim=-1)
-                all_attributions.append(attributions.detach().cpu())
-
-            all_attributions = torch.stack(all_attributions, dim=1)  # (batch_size, top_k, seq_len)
-
-            return {
-                "prediction": predictions,
-                "confidence": confidence,
-                "attributions": all_attributions,
-            }
-        else:
-            return predictions, confidence
