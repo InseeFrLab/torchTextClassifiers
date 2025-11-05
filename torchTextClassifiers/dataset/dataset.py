@@ -37,7 +37,7 @@ class TextClassificationDataset(Dataset):
         return len(self.texts)
 
     def __getitem__(self, idx):
-        if self.labels:
+        if self.labels is not None:
             return (
                 self.texts[idx],
                 (
@@ -61,7 +61,7 @@ class TextClassificationDataset(Dataset):
     def collate_fn(self, batch):
         text, *categorical_vars, y = zip(*batch)
 
-        if self.labels:
+        if self.labels is not None:
             labels_tensor = torch.tensor(y, dtype=torch.long)
         else:
             labels_tensor = None
