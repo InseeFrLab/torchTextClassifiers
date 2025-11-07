@@ -1,11 +1,9 @@
 [project]
 name = "torchtextclassifiers"
-description = "An implementation of the https://github.com/facebookresearch/fastText supervised learning algorithm for text classification using Pytorch."
+description = "A text classification toolkit to easily build, train and evaluate deep learning text classifiers using PyTorch."
 authors = [
-    { name = "Tom Seimandi", email = "tom.seimandi@gmail.com" },
-    { name = "Julien Pramil", email = "julien.pramil@insee.fr" },
-    { name = "Meilame Tayebjee", email = "meilame.tayebjee@insee.fr" },
     { name = "Cédric Couralet", email = "cedric.couralet@insee.fr" },
+    { name = "Meilame Tayebjee", email = "meilame.tayebjee@insee.fr" },
 ]
 readme = "README.md"
 repository = "https://github.com/InseeFrLab/torchTextClassifiers"
