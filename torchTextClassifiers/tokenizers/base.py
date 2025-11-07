@@ -42,8 +42,8 @@ class BaseTokenizer(ABC):
     def __repr__(self):
         return f"{self.__class__.__name__}(vocab_size={self.vocab_size}, output_vectorized={self.output_vectorized}, output_dim={self.output_dim})"
 
-    def __call__(self, text: Union[str, List[str]]) -> list:
-        return self.tokenize(text)
+    def __call__(self, text: Union[str, List[str]], **kwargs) -> list:
+        return self.tokenize(text, **kwargs)
 
 
 class HuggingFaceTokenizer(BaseTokenizer):
@@ -63,7 +63,9 @@ class HuggingFaceTokenizer(BaseTokenizer):
         self.padding_idx = padding_idx
         self.output_dim = output_dim  # constant context size for all batch
 
-    def tokenize(self, text: Union[str, List[str]]) -> list:
+    def tokenize(
+        self, text: Union[str, List[str]], return_offsets_mapping: Optional[bool] = False
+    ) -> list:
         if not self.trained:
             raise RuntimeError("Tokenizer must be trained before tokenization.")
 
@@ -75,6 +77,7 @@ class HuggingFaceTokenizer(BaseTokenizer):
             padding=padding,
             return_tensors="pt",
             max_length=self.output_dim,
+            return_offsets_mapping=return_offsets_mapping,
         )  # method from PreTrainedTokenizerFast
 
     @classmethod
@@ -122,4 +125,4 @@ class HuggingFaceTokenizer(BaseTokenizer):
         raise NotImplementedError("_post_training() not implemented for HuggingFaceTokenizer.")
 
     def __repr__(self):
-        return self.tokenizer.__repr__()
+        return f"{self.__class__.__name__} \n HuggingFace tokenizer: {self.tokenizer.__repr__()}"
