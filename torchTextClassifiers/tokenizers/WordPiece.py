@@ -90,3 +90,6 @@ class WordPieceTokenizer(HuggingFaceTokenizer):
                     filesystem.mkdirs(parent_dir)
                 filesystem.put(save_path, s3_save_path)
                 logger.info(f"💾 Tokenizer uploaded to S3 at {s3_save_path}")
+
+    def __repr__(self):
+        return self.tokenizer.__repr__()
