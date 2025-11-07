@@ -102,5 +102,6 @@ class HuggingFaceTokenizer(BaseTokenizer, ABC):
 
     @abstractmethod
     def _post_training(self):
-        """Applies post-training configurations to the tokenizer."""
-        pass
+
+    def __repr__(self):
+        return self.tokenizer.__repr__()
