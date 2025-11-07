@@ -93,7 +93,7 @@ class TextClassificationDataset(Dataset):
         shuffle: bool = False,
         drop_last: bool = False,
         num_workers: int = os.cpu_count() - 1,
-        pin_memory: bool = True,
+        pin_memory: bool = False,
         persistent_workers: bool = True,
         **kwargs,
     ) -> torch.utils.data.DataLoader:
