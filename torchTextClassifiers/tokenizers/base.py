@@ -3,7 +3,7 @@ from typing import List, Optional, Union
 
 try:
     from tokenizers import Tokenizer
-    from transformers import PreTrainedTokenizerFast
+    from transformers import AutoTokenizer, PreTrainedTokenizerFast
 
     HAS_HF = True
 except ImportError:
@@ -39,15 +39,26 @@ class BaseTokenizer(ABC):
     def __len__(self):
         return self.vocab_size
 
+    def __repr__(self):
+        return f"{self.__class__.__name__}(vocab_size={self.vocab_size}, output_vectorized={self.output_vectorized}, output_dim={self.output_dim})"
 
-class HuggingFaceTokenizer(BaseTokenizer, ABC):
-    def __init__(self, vocab_size: int, output_dim: Optional[int] = None):
+
+class HuggingFaceTokenizer(BaseTokenizer):
+    def __init__(
+        self,
+        vocab_size: int,
+        output_dim: Optional[int] = None,
+        padding_idx: Optional[int] = None,
+        trained: bool = False,
+    ):
         super().__init__(
             vocab_size, output_vectorized=False, output_dim=output_dim
         )  # it outputs token ids and not vectors
 
-        self.trained = False
+        self.trained = trained
         self.tokenizer = None
+        self.padding_idx = padding_idx
+        self.output_dim = output_dim  # constant context size for all batch
 
     def tokenize(self, text: Union[str, List[str]]) -> list:
         if not self.trained:
@@ -64,11 +75,21 @@ class HuggingFaceTokenizer(BaseTokenizer, ABC):
         )  # method from PreTrainedTokenizerFast
 
     @classmethod
+    def load_from_pretrained(cls, tokenizer_name: str, output_dim: Optional[int] = None):
+        tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
+        padding_idx = tokenizer.pad_token_id
+        instance = cls(
+            vocab_size=len(tokenizer), trained=True, padding_idx=padding_idx, output_dim=output_dim
+        )
+        instance.tokenizer = tokenizer
+        return instance
+
+    @classmethod
     def load(cls, load_path: str):
         loaded_tokenizer = PreTrainedTokenizerFast(tokenizer_file=load_path)
         instance = cls(vocab_size=len(loaded_tokenizer), trained=True)
         instance.tokenizer = loaded_tokenizer
-        instance._post_training()
+        # instance._post_training()
         return instance
 
     @classmethod
@@ -88,20 +109,14 @@ class HuggingFaceTokenizer(BaseTokenizer, ABC):
         instance._post_training()
         return instance
 
-    @abstractmethod
-    def train(
-        self,
-        training_corpus: list,
-        save_path: str = None,
-        filesystem=None,
-        s3_save_path=None,
-        **kwargs,
-    ):
-        """Trains the tokenizer on the provided training corpus."""
-        pass
+    def train(self, *args, **kwargs):
+        raise NotImplementedError(
+            "This tokenizer cannot be trained directly. "
+            "Load it from pretrained or implement train() in a subclass."
+        )
 
-    @abstractmethod
     def _post_training(self):
+        raise NotImplementedError("_post_training() not implemented for HuggingFaceTokenizer.")
 
     def __repr__(self):
         return self.tokenizer.__repr__()
