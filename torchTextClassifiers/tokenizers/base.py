@@ -42,6 +42,9 @@ class BaseTokenizer(ABC):
     def __repr__(self):
         return f"{self.__class__.__name__}(vocab_size={self.vocab_size}, output_vectorized={self.output_vectorized}, output_dim={self.output_dim})"
 
+    def __call__(self, text: Union[str, List[str]]) -> list:
+        return self.tokenize(text)
+
 
 class HuggingFaceTokenizer(BaseTokenizer):
     def __init__(
