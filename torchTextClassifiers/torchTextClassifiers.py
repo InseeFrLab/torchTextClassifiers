@@ -348,9 +348,9 @@ class torchTextClassifiers:
 
     @staticmethod
     def _check_text_col(X):
-        assert isinstance(X, np.ndarray), (
-            "X must be a numpy array of shape (N,d), with the first column being the text and the rest being the categorical variables."
-        )
+        assert isinstance(
+            X, np.ndarray
+        ), "X must be a numpy array of shape (N,d), with the first column being the text and the rest being the categorical variables."
 
         try:
             if X.ndim > 1:
@@ -412,9 +412,9 @@ class torchTextClassifiers:
 
     def _check_Y(self, Y):
         assert isinstance(Y, np.ndarray), "Y must be a numpy array of shape (N,) or (N,1)."
-        assert len(Y.shape) == 1 or (len(Y.shape) == 2 and Y.shape[1] == 1), (
-            "Y must be a numpy array of shape (N,) or (N,1)."
-        )
+        assert len(Y.shape) == 1 or (
+            len(Y.shape) == 2 and Y.shape[1] == 1
+        ), "Y must be a numpy array of shape (N,) or (N,1)."
 
         try:
             Y = Y.astype(int)
@@ -515,12 +515,12 @@ class torchTextClassifiers:
 
     def __repr__(self):
         model_type = (
-            self.lightning_module.__repr__() if hasattr(self, "lightning_module") else self.pytorch_model.__repr__()
+            self.lightning_module.__repr__()
+            if hasattr(self, "lightning_module")
+            else self.pytorch_model.__repr__()
         )
 
-        tokenizer_info = (
-            self.tokenizer.__repr__()
-        )
+        tokenizer_info = self.tokenizer.__repr__()
 
         cat_forward_type = (
             self.categorical_var_net.forward_type.name
