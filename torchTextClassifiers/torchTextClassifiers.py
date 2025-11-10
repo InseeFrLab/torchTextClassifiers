@@ -300,7 +300,7 @@ class torchTextClassifiers:
 
         trainer_params = {
             "callbacks": callbacks,
-            "max_epochs": training_config.batch_size,
+            "max_epochs": training_config.num_epochs,
             "num_sanity_val_steps": 2,
             "strategy": "auto",
             "log_every_n_steps": 1,
