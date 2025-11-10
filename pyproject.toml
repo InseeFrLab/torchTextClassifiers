@@ -42,15 +42,16 @@ docs = [
   "myst-parser>=0.18.0",
   "sphinx-design>=0.3.0"
 ]
+
+[project.optional-dependencies]
+explainability = ["unidecode", "nltk", "captum"]
+preprocess =     ["unidecode", "nltk"]
 hf-dep = [
     "tokenizers>=0.22.1",
     "transformers>=4.57.1",
     "datasets>=4.3.0",
 ]
 
-[project.optional-dependencies]
-explainability = ["unidecode", "nltk", "captum"]
-preprocess =     ["unidecode", "nltk"]
 
 [build-system]
 requires = ["uv_build>=0.9.3,<0.10.0"]

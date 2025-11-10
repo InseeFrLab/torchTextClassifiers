@@ -2058,6 +2058,11 @@ explainability = [
     { name = "nltk" },
     { name = "unidecode" },
 ]
+hf-dep = [
+    { name = "datasets" },
+    { name = "tokenizers" },
+    { name = "transformers" },
+]
 preprocess = [
     { name = "nltk" },
     { name = "unidecode" },
@@ -2084,23 +2089,21 @@ docs = [
     { name = "sphinx-rtd-theme" },
     { name = "sphinxcontrib-napoleon" },
 ]
-hf-dep = [
-    { name = "datasets" },
-    { name = "tokenizers" },
-    { name = "transformers" },
-]
 
 [package.metadata]
 requires-dist = [
     { name = "captum", marker = "extra == 'explainability'" },
+    { name = "datasets", marker = "extra == 'hf-dep'", specifier = ">=4.3.0" },
     { name = "nltk", marker = "extra == 'explainability'" },
     { name = "nltk", marker = "extra == 'preprocess'" },
     { name = "numpy", specifier = ">=1.26.4" },
     { name = "pytorch-lightning", specifier = ">=2.4.0" },
+    { name = "tokenizers", marker = "extra == 'hf-dep'", specifier = ">=0.22.1" },
+    { name = "transformers", marker = "extra == 'hf-dep'", specifier = ">=4.57.1" },
     { name = "unidecode", marker = "extra == 'explainability'" },
     { name = "unidecode", marker = "extra == 'preprocess'" },
 ]
-provides-extras = ["explainability", "preprocess"]
+provides-extras = ["explainability", "preprocess", "hf-dep"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -2122,11 +2125,6 @@ docs = [
     { name = "sphinx-design", specifier = ">=0.3.0" },
     { name = "sphinx-rtd-theme", specifier = ">=1.2.0" },
     { name = "sphinxcontrib-napoleon", specifier = ">=0.7" },
-]
-hf-dep = [
-    { name = "datasets", specifier = ">=4.3.0" },
-    { name = "tokenizers", specifier = ">=0.22.1" },
-    { name = "transformers", specifier = ">=4.57.1" },
 ]
 
 [[package]]
