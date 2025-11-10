@@ -28,7 +28,7 @@ from torchTextClassifiers.model.components import (
     ClassificationHead,
     TextEmbedder,
 )
-from torchTextClassifiers.tokenizers import BaseTokenizer
+from torchTextClassifiers.tokenizers import BaseTokenizer, TokenizerOutput
 
 logger = logging.getLogger(__name__)
 
@@ -474,8 +474,13 @@ class torchTextClassifiers:
             text.tolist(), return_offsets_mapping=return_offsets_mapping
         )
 
-        encoded_text = tokenize_output["input_ids"]  # (batch_size, seq_len)
-        attention_mask = tokenize_output["attention_mask"]  # (batch_size, seq_len)
+        if not isinstance(tokenize_output, TokenizerOutput):
+            raise TypeError(
+                f"Expected TokenizerOutput, got {type(tokenize_output)} from tokenizer.tokenize method."
+            )
+
+        encoded_text = tokenize_output.input_ids  # (batch_size, seq_len)
+        attention_mask = tokenize_output.attention_mask  # (batch_size, seq_len)
 
         if categorical_variables is not None:
             categorical_vars = torch.tensor(
@@ -511,10 +516,8 @@ class torchTextClassifiers:
                 "prediction": predictions,
                 "confidence": confidence,
                 "attributions": all_attributions,
-                "offset_mapping": tokenize_output.get("offset_mapping", None),
-                "word_ids": np.array(
-                    [tokenize_output.word_ids(i) for i in range(len(encoded_text))]
-                ),
+                "offset_mapping": tokenize_output.offset_mapping,
+                "word_ids": tokenize_output.word_ids,
             }
         else:
             return {

@@ -81,8 +81,8 @@ class TextClassificationDataset(Dataset):
             categorical_tensors = None
 
         return {
-            "input_ids": tokenize_output["input_ids"],
-            "attention_mask": tokenize_output["attention_mask"],
+            "input_ids": tokenize_output.input_ids,
+            "attention_mask": tokenize_output.attention_mask,
             "categorical_vars": categorical_tensors,
             "labels": labels_tensor,
         }

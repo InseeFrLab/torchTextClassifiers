@@ -1,5 +1,9 @@
 from abc import ABC, abstractmethod
-from typing import List, Optional, Union
+from dataclasses import asdict, dataclass
+from typing import Any, Dict, List, Optional, Union
+
+import numpy as np
+import torch
 
 try:
     from tokenizers import Tokenizer
@@ -8,6 +12,55 @@ try:
     HAS_HF = True
 except ImportError:
     HAS_HF = False
+
+
+@dataclass
+class TokenizerOutput:
+    input_ids: torch.Tensor  # shape: (batch_size, seq_len)
+    attention_mask: torch.Tensor  # shape: (batch_size, seq_len)
+    offset_mapping: Optional[torch.Tensor] = None  # shape: (batch_size, seq_len, 2)
+    word_ids: Optional[np.ndarray] = None  # shape: (batch_size, seq_len)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "TokenizerOutput":
+        return cls(**data)
+
+    def __post_init__(self):
+        # --- Basic type checks ---
+        if not isinstance(self.input_ids, torch.Tensor):
+            raise TypeError(f"token_ids must be a torch.Tensor, got {type(self.input_ids)}")
+        if not isinstance(self.attention_mask, torch.Tensor):
+            raise TypeError(
+                f"attention_mask must be a torch.Tensor, got {type(self.attention_mask)}"
+            )
+        if self.offset_mapping is not None and not isinstance(self.offset_mapping, torch.Tensor):
+            raise TypeError(
+                f"offset_mapping must be a torch.Tensor or None, got {type(self.offset_mapping)}"
+            )
+        if self.word_ids is not None and not isinstance(self.word_ids, np.ndarray):
+            raise TypeError(f"word_ids must be a numpy.ndarray or None, got {type(self.word_ids)}")
+
+        # --- Shape consistency checks ---
+        if self.input_ids.shape != self.attention_mask.shape:
+            raise ValueError(
+                f"Shape mismatch: token_ids {self.token_ids.shape} and attention_mask {self.attention_mask.shape}"
+            )
+
+        if self.offset_mapping is not None:
+            expected_shape = (*self.input_ids.shape, 2)
+            if self.offset_mapping.shape != expected_shape:
+                raise ValueError(
+                    f"offset_mapping should have shape {expected_shape}, got {self.offset_mapping.shape}"
+                )
+
+        if self.word_ids is not None:
+            if self.word_ids.shape != self.input_ids.shape:
+                raise ValueError(
+                    f"word_ids should have shape {self.input_ids.shape}, got {self.word_ids.shape}"
+                )
 
 
 class BaseTokenizer(ABC):
@@ -32,7 +85,7 @@ class BaseTokenizer(ABC):
                 )
 
     @abstractmethod
-    def tokenize(self, text: Union[str, List[str]]) -> list:
+    def tokenize(self, text: Union[str, List[str]]) -> TokenizerOutput:
         """Tokenizes the raw input text into a list of tokens."""
         pass
 
@@ -72,13 +125,22 @@ class HuggingFaceTokenizer(BaseTokenizer):
         # Pad to longest sequence if no output_dim is specified
         padding = True if self.output_dim is None else "max_length"
 
-        return self.tokenizer(
+        tokenize_output = self.tokenizer(
             text,
             padding=padding,
             return_tensors="pt",
             max_length=self.output_dim,
             return_offsets_mapping=return_offsets_mapping,
         )  # method from PreTrainedTokenizerFast
+
+        encoded_text = tokenize_output["input_ids"]
+
+        return TokenizerOutput(
+            input_ids=encoded_text,
+            attention_mask=tokenize_output["attention_mask"],
+            offset_mapping=tokenize_output.get("offset_mapping", None),
+            word_ids=np.array([tokenize_output.word_ids(i) for i in range(len(encoded_text))]),
+        )
 
     @classmethod
     def load_from_pretrained(cls, tokenizer_name: str, output_dim: Optional[int] = None):
