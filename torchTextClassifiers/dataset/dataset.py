@@ -96,7 +96,10 @@ class TextClassificationDataset(Dataset):
         pin_memory: bool = False,
         persistent_workers: bool = True,
         **kwargs,
-    ) -> torch.utils.data.DataLoader:
+        # persistent_workers requires num_workers > 0
+        if num_workers == 0:
+            persistent_workers = False
+
         return DataLoader(
             dataset=self,
             batch_size=batch_size,
