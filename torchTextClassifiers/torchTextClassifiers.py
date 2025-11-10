@@ -227,7 +227,12 @@ class torchTextClassifiers:
             X_train["categorical_variables"].ndim > 1
             and X_train["categorical_variables"].shape[1] == X_val["categorical_variables"].shape[1]
             or X_val["categorical_variables"].ndim == 1
-        ), "X_train and X_val must have the same number of columns."
+        if X_train["categorical_variables"] is not None and X_val["categorical_variables"] is not None:
+            assert (
+                X_train["categorical_variables"].ndim > 1
+                and X_train["categorical_variables"].shape[1] == X_val["categorical_variables"].shape[1]
+                or X_val["categorical_variables"].ndim == 1
+            ), "X_train and X_val must have the same number of columns."
 
         if verbose:
             logger.info("Starting training process...")
