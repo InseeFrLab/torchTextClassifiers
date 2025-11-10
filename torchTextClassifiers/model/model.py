@@ -69,6 +69,10 @@ class TextClassificationModel(nn.Module):
 
         self.num_classes = self.classification_head.num_classes
 
+        torch.nn.init.zeros_(self.classification_head.net.weight)
+        if self.text_embedder is not None:
+            self.text_embedder.init_weights()
+
     def _validate_component_connections(self):
         def _check_text_categorical_connection(self, text_embedder, cat_var_net):
             if cat_var_net.forward_type == CategoricalForwardType.SUM_TO_TEXT:

@@ -23,10 +23,12 @@ from pytorch_lightning.callbacks import (
 from torchTextClassifiers.dataset import TextClassificationDataset
 from torchTextClassifiers.model import TextClassificationModel, TextClassificationModule
 from torchTextClassifiers.model.components import (
+    AttentionConfig,
     CategoricalForwardType,
     CategoricalVariableNet,
     ClassificationHead,
     TextEmbedder,
+    TextEmbedderConfig,
 )
 from torchTextClassifiers.tokenizers import BaseTokenizer, TokenizerOutput
 
@@ -48,6 +50,7 @@ class ModelConfig:
     categorical_vocabulary_sizes: Optional[List[int]] = None
     categorical_embedding_dims: Optional[Union[List[int], int]] = None
     num_classes: Optional[int] = None
+    attention_config: Optional[AttentionConfig] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -139,10 +142,14 @@ class torchTextClassifiers:
             )
             self.embedding_dim = self.tokenizer.output_dim
         else:
-            self.text_embedder = TextEmbedder(
+            text_embedder_config = TextEmbedderConfig(
                 vocab_size=self.vocab_size,
                 embedding_dim=self.embedding_dim,
                 padding_idx=tokenizer.padding_idx,
+                attention_config=model_config.attention_config,
+            )
+            self.text_embedder = TextEmbedder(
+                text_embedder_config=text_embedder_config,
             )
 
         classif_head_input_dim = self.embedding_dim
