@@ -61,7 +61,6 @@ class TextClassificationDataset(Dataset):
     def collate_fn(self, batch):
         text, *categorical_vars, y = zip(*batch)
 
-        print(text)
         if self.labels is not None:
             labels_tensor = torch.tensor(y, dtype=torch.long)
         else:
