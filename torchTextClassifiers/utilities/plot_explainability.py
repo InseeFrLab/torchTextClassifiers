@@ -1,3 +1,5 @@
+from typing import List, Optional
+
 import numpy as np
 import torch
 
@@ -40,14 +42,16 @@ def map_attributions_to_char(attributions, offsets, text):
     if attributions.ndim == 1:
         attributions = attributions[None, :]
 
-    attributions_per_char = np.empty((attributions.shape[0], len(text)))  # top_k, text_len
+    attributions_per_char = np.zeros((attributions.shape[0], len(text)))  # top_k, text_len
 
     for token_idx, (start, end) in enumerate(offsets):
-        if start == end:
+        if start == end:  # skip special tokens
             continue
         attributions_per_char[:, start:end] = attributions[:, token_idx][:, None]
 
-    return attributions_per_char
+    return np.exp(attributions_per_char) / np.sum(
+        np.exp(attributions_per_char), axis=1, keepdims=True
+    )  # softmax normalization
 
 
 def map_attributions_to_word(attributions, word_ids):
@@ -71,9 +75,14 @@ def map_attributions_to_word(attributions, word_ids):
     # Convert None to -1 for easier processing (PAD tokens)
     word_ids_int = np.array([x if x is not None else -1 for x in word_ids], dtype=int)
 
-    # Consider only tokens that belong to actual words (non-PAD)
+    # Filter out PAD tokens from attributions and word_ids
+    attributions = attributions[
+        torch.arange(attributions.shape[0])[:, None],
+        torch.tensor(np.where(word_ids_int != -1)[0])[None, :],
+    ]
+    word_ids_int = word_ids_int[word_ids_int != -1]
     unique_word_ids = np.unique(word_ids_int)
-    unique_word_ids = unique_word_ids[unique_word_ids != -1]
+    num_unique_words = len(unique_word_ids)
 
     top_k = attributions.shape[0]
     attr_with_word_id = np.concat(
@@ -82,17 +91,25 @@ def map_attributions_to_word(attributions, word_ids):
     )  # top_k, seq_len, 2
     # last dim is 2: 0 is the attribution of the token, 1 is the word_id the token is associated to
 
-    word_attributions = np.zeros((top_k, len(word_ids_int)))
+    word_attributions = np.zeros((top_k, num_unique_words))
     for word_id in unique_word_ids:
         mask = attr_with_word_id[:, :, 1] == word_id  # top_k, seq_len
         word_attributions[:, word_id] = (attr_with_word_id[:, :, 0] * mask).sum(
             axis=1
         )  # zero-out non-matching tokens and sum attributions for all tokens belonging to the same word
 
-    return word_attributions
+    # assert word_attributions.sum(axis=1) == attributions.sum(axis=1), "Sum of word attributions per top_k must equal sum of token attributions per top_k."
+    return np.exp(word_attributions) / np.sum(
+        np.exp(word_attributions), axis=1, keepdims=True
+    )  # softmax normalization
 
 
-def plot_attributions_at_char(text, attributions_per_char, title="Attributions", figsize=(10, 2)):
+def plot_attributions_at_char(
+    text: str,
+    attributions_per_char: np.ndarray,
+    figsize=(10, 2),
+    titles: Optional[List[str]] = None,
+):
     """
     Plots character-level attributions as a heatmap.
     Args:
@@ -107,23 +124,26 @@ def plot_attributions_at_char(text, attributions_per_char, title="Attributions",
         raise ImportError(
             "matplotlib is required for plotting. Please install it to use this function."
         )
+    top_k = attributions_per_char.shape[0]
 
-    plt.figure(figsize=figsize)
-    plt.imshow(attributions_per_char, aspect="auto", cmap="viridis")
-    plt.colorbar(label="Attribution Score")
-    plt.yticks(
-        ticks=np.arange(attributions_per_char.shape[0]),
-        labels=[f"Top {i+1}" for i in range(attributions_per_char.shape[0])],
-    )
-    plt.xticks(ticks=np.arange(len(text)), labels=list(text), rotation=90)
-    plt.title(title)
-    plt.xlabel("Characters in Text")
-    plt.ylabel("Top Predictions")
-    plt.tight_layout()
-    plt.show()
+    all_plots = []
+    for i in range(top_k):
+        fig, ax = plt.subplots(figsize=figsize)
+        ax.bar(range(len(text)), attributions_per_char[i])
+        ax.set_xticks(np.arange(len(text)))
+        ax.set_xticklabels(list(text), rotation=90)
+        title = titles[i] if titles is not None else f"Attributions for Top {i+1} Prediction"
+        ax.set_title(title)
+        ax.set_xlabel("Characters in Text")
+        ax.set_ylabel("Top Predictions")
+        all_plots.append(fig)
+
+    return all_plots
 
 
-def plot_attributions_at_word(text, attributions_per_word, title="Attributions", figsize=(10, 2)):
+def plot_attributions_at_word(
+    text, attributions_per_word, figsize=(10, 2), titles: Optional[List[str]] = None
+):
     """
     Plots word-level attributions as a heatmap.
     Args:
@@ -140,16 +160,25 @@ def plot_attributions_at_word(text, attributions_per_word, title="Attributions",
         )
 
     words = text.split()
-    plt.figure(figsize=figsize)
-    plt.imshow(attributions_per_word, aspect="auto", cmap="viridis")
-    plt.colorbar(label="Attribution Score")
-    plt.yticks(
-        ticks=np.arange(attributions_per_word.shape[0]),
-        labels=[f"Top {i+1}" for i in range(attributions_per_word.shape[0])],
-    )
-    plt.xticks(ticks=np.arange(len(words)), labels=words, rotation=90)
-    plt.title(title)
-    plt.xlabel("Words in Text")
-    plt.ylabel("Top Predictions")
-    plt.tight_layout()
+    top_k = attributions_per_word.shape[0]
+    all_plots = []
+    for i in range(top_k):
+        fig, ax = plt.subplots(figsize=figsize)
+        ax.bar(range(len(words)), attributions_per_word[i])
+        ax.set_xticks(np.arange(len(words)))
+        ax.set_xticklabels(words, rotation=90)
+        title = titles[i] if titles is not None else f"Attributions for Top {i+1} Prediction"
+        ax.set_title(title)
+        ax.set_xlabel("Words in Text")
+        ax.set_ylabel("Attributions")
+        all_plots.append(fig)
+
+    return all_plots
+
+
+def figshow(figure):
+    # https://stackoverflow.com/questions/53088212/create-multiple-figures-in-pyplot-but-only-show-one
+    for i in plt.get_fignums():
+        if figure != plt.figure(i):
+            plt.close(plt.figure(i))
     plt.show()
