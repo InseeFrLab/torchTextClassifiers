@@ -129,6 +129,7 @@ class HuggingFaceTokenizer(BaseTokenizer):
             text,
             padding=padding,
             return_tensors="pt",
+            truncation=True,
             max_length=self.output_dim,
             return_offsets_mapping=return_offsets_mapping,
         )  # method from PreTrainedTokenizerFast
