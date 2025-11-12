@@ -486,7 +486,7 @@ class torchTextClassifiers:
         text = X_test["text"]
         categorical_variables = X_test["categorical_variables"]
 
-        self.pytorch_model.eval()
+        self.pytorch_model.eval().cpu()
 
         tokenize_output = self.tokenizer.tokenize(
             text.tolist(), return_offsets_mapping=return_offsets_mapping
