@@ -410,9 +410,9 @@ class torchTextClassifiers:
                 f"Columns {1} to {X.shape[1] - 1} of X_train must be castable in integer format."
             )
 
-        for j in range(1, X.shape[1]):
-            max_cat_value = categorical_variables.max()
-            if max_cat_value >= self.categorical_var_net.categorical_vocabulary_sizes[j - 1]:
+        for j in range(X.shape[1] - 1):
+            max_cat_value = categorical_variables[:, j].max()
+            if max_cat_value >= self.categorical_var_net.categorical_vocabulary_sizes[j]:
                 raise ValueError(
                     f"Categorical variable at index {j} has value {max_cat_value} which exceeds the vocabulary size of {self.categorical_var_net.categorical_vocabulary_sizes[j]}."
                 )
