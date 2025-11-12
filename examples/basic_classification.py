@@ -6,7 +6,9 @@ text classification using the FastText classifier.
 """
 
 import numpy as np
-from torchTextClassifiers import create_fasttext
+from torchTextClassifiers import ModelConfig, TrainingConfig, torchTextClassifiers
+from torchTextClassifiers.tokenizers import WordPieceTokenizer
+
 
 def main():
     print("🚀 Basic Text Classification Example")
@@ -48,43 +50,57 @@ def main():
     print(f"Validation samples: {len(X_val)}")
     print(f"Test samples: {len(X_test)}")
     
-    # Create FastText classifier
-    print("\n🏗️ Creating FastText classifier...")
-    classifier = create_fasttext(
+    # Create and train tokenizer
+    print("\n🏗️ Creating and training WordPiece tokenizer...")
+    tokenizer = WordPieceTokenizer(vocab_size=5000, output_dim=128)
+    
+    # Train tokenizer on the training corpus
+    training_corpus = X_train.tolist()
+    tokenizer.train(training_corpus)
+    print("✅ Tokenizer trained successfully!")
+
+    # Create model configuration
+    print("\n🔧 Creating model configuration...")
+    model_config = ModelConfig(
         embedding_dim=50,
-        sparse=False,
-        num_tokens=5000,
-        min_count=1,
-        min_n=3,
-        max_n=6,
-        len_word_ngrams=2,
         num_classes=2
     )
-    
-    # Build the model
-    print("\n🔨 Building model...")
-    classifier.build(X_train, y_train)
-    print("✅ Model built successfully!")
+
+    # Create classifier
+    print("\n🔨 Creating classifier...")
+    classifier = torchTextClassifiers(
+        tokenizer=tokenizer,
+        model_config=model_config
+    )
+    print("✅ Classifier created successfully!")
     
     # Train the model
     print("\n🎯 Training model...")
-    classifier.train(
-        X_train, y_train, X_val, y_val,
+    training_config = TrainingConfig(
         num_epochs=20,
         batch_size=4,
-        patience_train=5,
+        lr=1e-3,
+        patience_early_stopping=5,
+        num_workers=0  # Use 0 for simple examples to avoid multiprocessing issues
+    )
+    classifier.train(
+        X_train, y_train, X_val, y_val,
+        training_config=training_config,
         verbose=True
     )
     print("✅ Training completed!")
     
     # Make predictions
     print("\n🔮 Making predictions...")
-    predictions = classifier.predict(X_test)
+    result = classifier.predict(X_test)
+    predictions = result["prediction"].squeeze().numpy()  # Extract predictions from dictionary
+    confidence = result["confidence"].squeeze().numpy()  # Extract confidence scores
     print(f"Predictions: {predictions}")
+    print(f"Confidence: {confidence}")
     print(f"True labels: {y_test}")
-    
+
     # Calculate accuracy
-    accuracy = classifier.validate(X_test, y_test)
+    accuracy = (predictions == y_test).mean()
     print(f"Test accuracy: {accuracy:.3f}")
     
     # Show detailed results
