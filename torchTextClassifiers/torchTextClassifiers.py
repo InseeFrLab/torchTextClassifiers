@@ -223,12 +223,6 @@ class torchTextClassifiers:
         X_train, y_train = self._check_XY(X_train, y_train)
         X_val, y_val = self._check_XY(X_val, y_val)
 
-        assert (
-            X_train["categorical_variables"].ndim > 1
-            and X_train["categorical_variables"].shape[1] == X_val["categorical_variables"].shape[1]
-            or X_val["categorical_variables"].ndim == 1
-        )
-
         if (
             X_train["categorical_variables"] is not None
             and X_val["categorical_variables"] is not None
