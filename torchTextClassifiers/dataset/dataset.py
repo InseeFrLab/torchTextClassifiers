@@ -39,7 +39,7 @@ class TextClassificationDataset(Dataset):
     def __getitem__(self, idx):
         if self.labels is not None:
             return (
-                self.texts[idx],
+                str(self.texts[idx]),
                 (
                     self.categorical_variables[idx]
                     if self.categorical_variables is not None
@@ -49,7 +49,7 @@ class TextClassificationDataset(Dataset):
             )
         else:
             return (
-                self.texts[idx],
+                str(self.texts[idx]),
                 (
                     self.categorical_variables[idx]
                     if self.categorical_variables is not None
@@ -61,12 +61,13 @@ class TextClassificationDataset(Dataset):
     def collate_fn(self, batch):
         text, *categorical_vars, y = zip(*batch)
 
+        print(text)
         if self.labels is not None:
             labels_tensor = torch.tensor(y, dtype=torch.long)
         else:
             labels_tensor = None
 
-        tokenize_output = self.tokenizer.tokenize(text)
+        tokenize_output = self.tokenizer.tokenize(list(text))
 
         if self.categorical_variables is not None:
             categorical_tensors = torch.stack(
@@ -96,6 +97,7 @@ class TextClassificationDataset(Dataset):
         pin_memory: bool = False,
         persistent_workers: bool = True,
         **kwargs,
+    ):
         # persistent_workers requires num_workers > 0
         if num_workers == 0:
             persistent_workers = False
