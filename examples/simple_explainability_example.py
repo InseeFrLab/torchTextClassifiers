@@ -2,14 +2,48 @@
 Simple Explainability Example with ASCII Visualization
 """
 
-import numpy as np
+import os
 import sys
-from torchTextClassifiers import create_fasttext
+import warnings
+
+import numpy as np
+import torch
+from pytorch_lightning import seed_everything
+
+from torchTextClassifiers import ModelConfig, TrainingConfig, torchTextClassifiers
+from torchTextClassifiers.tokenizers import WordPieceTokenizer
+from torchTextClassifiers.utilities.plot_explainability import (
+    map_attributions_to_char,
+    map_attributions_to_word,
+)
 
 
 def main():
+    # Set seed for reproducibility
+    SEED = 42
+
+    # Set environment variables for full reproducibility
+    os.environ['PYTHONHASHSEED'] = str(SEED)
+    os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
+
+    # Use PyTorch Lightning's seed_everything for comprehensive seeding
+    seed_everything(SEED, workers=True)
+
+    # Make PyTorch operations deterministic
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    torch.use_deterministic_algorithms(True, warn_only=True)
+
+    # Suppress PyTorch Lightning warnings for cleaner output
+    warnings.filterwarnings(
+        'ignore',
+        message='.*',
+        category=UserWarning,
+        module='pytorch_lightning'
+    )
+
     print("🔍 Simple Explainability Example")
-    
+
     # Enhanced training data with more diverse examples
     X_train = np.array([
         # Positive examples
@@ -55,29 +89,51 @@ def main():
     ])
     
     X_val = np.array([
-        "Good product with decent quality", 
+        "Good product with decent quality",
         "Bad quality and poor service",
         "Excellent value and great design",
         "Terrible experience and awful quality"
     ])
     y_val = np.array([1, 0, 1, 0])
-    
-    # Create classifier
-    classifier = create_fasttext(
+
+    # Create and train tokenizer
+    print("\n🏗️ Creating and training WordPiece tokenizer...")
+    tokenizer = WordPieceTokenizer(vocab_size=5000, output_dim=128)
+    training_corpus = X_train.tolist()
+    tokenizer.train(training_corpus)
+    print("✅ Tokenizer trained successfully!")
+
+    # Create model configuration
+    print("\n🔧 Creating model configuration...")
+    model_config = ModelConfig(
         embedding_dim=50,
-        sparse=False,
-        num_tokens=1000,
-        min_count=1,
-        min_n=3,
-        max_n=6,
-        len_word_ngrams=2,
-        num_classes=2,
-        direct_bagging=False  # Required for explainability
+        num_classes=2
     )
-    
-    # Train
-    classifier.build(X_train, y_train)
-    classifier.train(X_train, y_train, X_val, y_val, num_epochs=25, batch_size=8, verbose=False)
+
+    # Create classifier
+    print("\n🔨 Creating classifier...")
+    classifier = torchTextClassifiers(
+        tokenizer=tokenizer,
+        model_config=model_config
+    )
+    print("✅ Classifier created successfully!")
+
+    # Train the model
+    print("\n🎯 Training model...")
+    training_config = TrainingConfig(
+        num_epochs=25,
+        batch_size=8,
+        lr=1e-3,
+        patience_early_stopping=5,
+        num_workers=0,
+        trainer_params={'deterministic': True}
+    )
+    classifier.train(
+        X_train, y_train, X_val, y_val,
+        training_config=training_config,
+        verbose=True
+    )
+    print("✅ Training completed!")
     
     # Test examples with different sentiments
     test_texts = [
@@ -94,49 +150,70 @@ def main():
     for i, test_text in enumerate(test_texts, 1):
         print(f"\n📝 Example {i}:")
         print(f"Text: '{test_text}'")
-        
-        # Get prediction
-        prediction = classifier.predict(np.array([test_text]))[0]
-        print(f"Prediction: {'Positive' if prediction == 1 else 'Negative'}")
-        
-        # Get explainability scores
+
+        # Get prediction with explainability
         try:
-            pred, confidence, all_scores, all_scores_letters = classifier.predict_and_explain(np.array([test_text]))
-            
-            # Create ASCII histogram
-            if all_scores is not None and len(all_scores) > 0:
-                scores_data = all_scores[0][0]
-                if hasattr(scores_data, 'tolist'):
-                    scores = scores_data.tolist()
-                else:
-                    scores = [float(scores_data)]
-                
-                words = test_text.split()
-                
-                if len(words) == len(scores):
-                    print("\n📊 Word Contribution Histogram:")
-                    print("-" * 50)
-                    
-                    # Find max score for scaling
-                    max_score = max(scores) if scores else 1
-                    bar_width = 30  # max bar width in characters
-                    
-                    for word, score in zip(words, scores):
-                        # Calculate bar length
-                        bar_length = int((score / max_score) * bar_width)
-                        bar = "█" * bar_length
-                        
-                        # Format output
-                        print(f"{word:>12} | {bar:<30} {score:.4f}")
-                    
-                    print("-" * 50)
-                else:
-                    print(f"⚠️  Word/score mismatch: {len(words)} words vs {len(scores)} scores")
-            else:
-                print("⚠️  No explainability scores available")
-                
+            result = classifier.predict(np.array([test_text]), top_k=1, explain=True)
+
+            # Extract prediction
+            prediction = result["prediction"][0][0].item()
+            confidence = result["confidence"][0][0].item()
+            print(f"Prediction: {'Positive' if prediction == 1 else 'Negative'} (confidence: {confidence:.4f})")
+
+            # Extract attributions and mapping info
+            attributions = result["attributions"][0][0]  # shape: (seq_len,)
+            offset_mapping = result["offset_mapping"][0]  # List of (start, end) tuples
+            word_ids = result["word_ids"][0]  # List of word IDs for each token
+
+            # Map token-level attributions to character-level (for ASCII visualization)
+            char_attributions = map_attributions_to_char(
+                attributions.unsqueeze(0),  # Add batch dimension: (1, seq_len)
+                offset_mapping,
+                test_text
+            )[0]  # Get first result
+
+            print("\n📊 Character-Level Contribution Visualization:")
+            print("-" * 60)
+
+            # Create a simple ASCII visualization by character
+            max_attr = max(char_attributions) if len(char_attributions) > 0 else 1
+            bar_width = 40
+
+            # Group characters into words for better readability
+            words = test_text.split()
+            char_idx = 0
+
+            for word in words:
+                word_len = len(word)
+                # Get attributions for this word
+                word_attrs = char_attributions[char_idx:char_idx + word_len]
+                if len(word_attrs) > 0:
+                    avg_attr = sum(word_attrs) / len(word_attrs)
+                    bar_length = int((avg_attr / max_attr) * bar_width) if max_attr > 0 else 0
+                    bar = "█" * bar_length
+                    print(f"{word:>15} | {bar:<40} {avg_attr:.4f}")
+                char_idx += word_len + 1  # +1 for space
+
+            print("-" * 60)
+
+            # Show top contributing word
+            char_idx = 0
+            word_scores = []
+            for word in words:
+                word_len = len(word)
+                word_attrs = char_attributions[char_idx:char_idx + word_len]
+                if len(word_attrs) > 0:
+                    word_scores.append((word, sum(word_attrs) / len(word_attrs)))
+                char_idx += word_len + 1
+
+            if word_scores:
+                top_word, top_score = max(word_scores, key=lambda x: x[1])
+                print(f"💡 Most influential word: '{top_word}' (avg score: {top_score:.4f})")
+
         except Exception as e:
             print(f"⚠️  Explainability failed: {e}")
+            import traceback
+            traceback.print_exc()
         
         # Analysis completed for this example
         print(f"✅ Analysis completed for example {i}")
@@ -164,56 +241,72 @@ def main():
                     continue
                 
                 print(f"\n🔍 Analyzing: '{user_text}'")
-                
-                # Get prediction
-                prediction = classifier.predict(np.array([user_text]))[0]
-                sentiment = "Positive" if prediction == 1 else "Negative"
-                print(f"🎯 Prediction: {sentiment}")
-                
-                # Get explainability scores
+
+                # Get prediction with explainability
                 try:
-                    pred, confidence, all_scores, all_scores_letters = classifier.predict_and_explain(np.array([user_text]))
-                    
-                    # Create ASCII histogram
-                    if all_scores is not None and len(all_scores) > 0:
-                        scores_data = all_scores[0][0]
-                        if hasattr(scores_data, 'tolist'):
-                            scores = scores_data.tolist()
-                        else:
-                            scores = [float(scores_data)]
-                        
-                        words = user_text.split()
-                        
-                        if len(words) == len(scores):
-                            print("\n📊 Word Contribution Histogram:")
-                            print("-" * 50)
-                            
-                            # Find max score for scaling
-                            max_score = max(scores) if scores else 1
-                            bar_width = 30  # max bar width in characters
-                            
-                            for word, score in zip(words, scores):
-                                # Calculate bar length
-                                bar_length = int((score / max_score) * bar_width)
-                                bar = "█" * bar_length
-                                
-                                # Format output
-                                print(f"{word:>12} | {bar:<30} {score:.4f}")
-                            
-                            print("-" * 50)
-                            
-                            # Show interpretation
-                            top_word = max(zip(words, scores), key=lambda x: x[1])
-                            print(f"💡 Most influential word: '{top_word[0]}' (score: {top_word[1]:.4f})")
-                            
-                        else:
-                            print(f"⚠️  Word/score mismatch: {len(words)} words vs {len(scores)} scores")
-                    else:
-                        print("⚠️  No explainability scores available")
-                        
+                    result = classifier.predict(np.array([user_text]), top_k=1, explain=True)
+
+                    # Extract prediction
+                    prediction = result["prediction"][0][0].item()
+                    confidence = result["confidence"][0][0].item()
+                    sentiment = "Positive" if prediction == 1 else "Negative"
+                    print(f"🎯 Prediction: {sentiment} (confidence: {confidence:.4f})")
+
+                    # Extract attributions and mapping info
+                    attributions = result["attributions"][0][0]  # shape: (seq_len,)
+                    offset_mapping = result["offset_mapping"][0]  # List of (start, end) tuples
+                    word_ids = result["word_ids"][0]  # List of word IDs for each token
+
+                    # Map token-level attributions to character-level (for ASCII visualization)
+                    char_attributions = map_attributions_to_char(
+                        attributions.unsqueeze(0),  # Add batch dimension: (1, seq_len)
+                        offset_mapping,
+                        user_text
+                    )[0]  # Get first result
+
+                    print("\n📊 Character-Level Contribution Visualization:")
+                    print("-" * 60)
+
+                    # Create a simple ASCII visualization by character
+                    max_attr = max(char_attributions) if len(char_attributions) > 0 else 1
+                    bar_width = 40
+
+                    # Group characters into words for better readability
+                    words = user_text.split()
+                    char_idx = 0
+
+                    for word in words:
+                        word_len = len(word)
+                        # Get attributions for this word
+                        word_attrs = char_attributions[char_idx:char_idx + word_len]
+                        if len(word_attrs) > 0:
+                            avg_attr = sum(word_attrs) / len(word_attrs)
+                            bar_length = int((avg_attr / max_attr) * bar_width) if max_attr > 0 else 0
+                            bar = "█" * bar_length
+                            print(f"{word:>15} | {bar:<40} {avg_attr:.4f}")
+                        char_idx += word_len + 1  # +1 for space
+
+                    print("-" * 60)
+
+                    # Show interpretation
+                    char_idx = 0
+                    word_scores = []
+                    for word in words:
+                        word_len = len(word)
+                        word_attrs = char_attributions[char_idx:char_idx + word_len]
+                        if len(word_attrs) > 0:
+                            word_scores.append((word, sum(word_attrs) / len(word_attrs)))
+                        char_idx += word_len + 1
+
+                    if word_scores:
+                        top_word, top_score = max(word_scores, key=lambda x: x[1])
+                        print(f"💡 Most influential word: '{top_word}' (avg score: {top_score:.4f})")
+
                 except Exception as e:
                     print(f"⚠️  Explainability failed: {e}")
                     print("🔍 Prediction available, but detailed explanation unavailable.")
+                    import traceback
+                    traceback.print_exc()
                 
                 print("\n" + "-"*50)
                 

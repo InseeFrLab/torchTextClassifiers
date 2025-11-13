@@ -2,19 +2,26 @@
 Categorical Features Comparison Example
 
 This example demonstrates the performance difference between:
-1. A FastText classifier using only text features
-2. A FastText classifier using both text and categorical features
+1. A classifier using only text features
+2. A classifier using both text and categorical features
 """
+
+import os
+import random
+import time
+import warnings
 
 import numpy as np
 import pandas as pd
+import torch
+from pytorch_lightning import seed_everything
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
-from torchTextClassifiers import create_fasttext
-from torchTextClassifiers.utilities.preprocess import clean_text_feature
-from torchTextClassifiers import torchTextClassifiers
-from torchTextClassifiers.classifiers.simple_text_classifier import SimpleTextWrapper, SimpleTextConfig
-import time
+
+from torchTextClassifiers import ModelConfig, TrainingConfig, torchTextClassifiers
+from torchTextClassifiers.tokenizers import WordPieceTokenizer
+# Note: SimpleTextWrapper is not available in the current version
+# from torchTextClassifiers.classifiers.simple_text_classifier import SimpleTextConfig, SimpleTextWrapper
 
 def stratified_split_rare_labels(X, y, test_size=0.2, min_train_samples=1):
     # Get unique labels and their frequencies
@@ -95,131 +102,102 @@ def train_and_evaluate_model(X, y, model_name, use_categorical=False, use_simple
         X_temp, y_temp, test_size=0.5  # Split temp 50/50 into validation and test
     )
     
+    # Note: SimpleTextWrapper is not available in the current version
+    # The use_simple branch has been disabled
     if use_simple:
-        start_time = time.time()
-
-        simple_text_config = SimpleTextConfig(
-            hidden_dim=128,
-            num_classes=5,
-            max_features=5000,
-            learning_rate=1e-3,
-            dropout_rate=0.2
+        raise NotImplementedError(
+            "SimpleTextWrapper is not available in the current version. "
+            "Please use the standard torchTextClassifiers with WordPieceTokenizer instead."
         )
-        wrapper = SimpleTextWrapper(simple_text_config)
-        classifier = torchTextClassifiers(wrapper)
-        print(f"Classifier type: {type(classifier.classifier).__name__}")
-        print(f"Uses tokenizer: {hasattr(classifier.classifier, 'tokenizer')}")
-        print(f"Uses vectorizer: {hasattr(classifier.classifier, 'vectorizer')}")
-        
-        # Build the model (this will use TF-IDF vectorization instead of tokenization)
-        print("\n🔨 Building model with TF-IDF preprocessing...")
-        classifier.build(X_train, y_train)
-        print("✅ Model built successfully!")
-        print(f"TF-IDF features: {len(classifier.classifier.vectorizer.get_feature_names_out())}")
-        
-        # Train the model
-        print("\n🎯 Training model...")
-        classifier.train(
-            X_train, y_train, X_val, y_val,
-            num_epochs=10,
-            batch_size=4,
-            patience_train=3,
-            verbose=True
-        )
-        training_time = time.time() - start_time
-        accuracy = classifier.validate(X_test, y_test)
-        print(f"Test accuracy: {accuracy:.3f}")
 
-        return {
-            'model_name': model_name,
-            'test_accuracy': accuracy,
-            'training_time': training_time,
-            'classifier': classifier
-        }
+    # Create and train tokenizer
+    print("   🏗️ Creating and training tokenizer...")
+    tokenizer = WordPieceTokenizer(vocab_size=5000, output_dim=128)
 
-    # Model parameters
+    # Extract text column for tokenizer training
+    if use_categorical:
+        text_data = X_train[:, 0].tolist()  # First column is text
+    else:
+        text_data = X_train.tolist()  # All data is text
+
+    tokenizer.train(text_data)
+    print("   ✅ Tokenizer trained successfully!")
+
+    # Model configuration
     if use_categorical:
         # For mixed model - get vocabulary sizes from data
-        # cat_data = X_train[:, 1:].astype(int)  # Categorical features
-        # vocab_sizes = [int(np.max(cat_data[:, i]) + 1) for i in range(cat_data.shape[1])]
-        
-        model_params = {
-            "embedding_dim": 50,
-            "sparse": False,
-            "num_tokens": 50000,
-            "min_count": 1,
-            "min_n": 3,
-            "max_n": 6,
-            "len_word_ngrams": 2,
-            "categorical_embedding_dims": 10,
-            #"num_categorical_features": num_cat_var,
-            #"categorical_vocabulary_sizes": vocab_sizes,
-            #"categorical_embedding_dims": 10
-        }
-        #print(f"   Categorical vocabulary sizes: {vocab_sizes}")
+        cat_data = X_train[:, 1:].astype(int)  # Categorical features
+        vocab_sizes = [int(np.max(cat_data[:, i]) + 1) for i in range(cat_data.shape[1])]
+
+        model_config = ModelConfig(
+            embedding_dim=50,
+            categorical_vocabulary_sizes=vocab_sizes,
+            categorical_embedding_dims=10,
+            num_classes=5
+        )
+        print(f"   Categorical vocabulary sizes: {vocab_sizes}")
     else:
         # For text-only model
-        model_params = {
-            "embedding_dim": 50,
-            "sparse": False,
-            
-            "num_tokens": 50000,
-            "min_count": 1,
-            "min_n": 3,
-            "max_n": 6,
-            "len_word_ngrams": 2
-        }
-    
-    # Training parameters - reduced to save disk space
-    train_params = {
-        "num_epochs": 50,
-        "batch_size": 128,
-        "patience_train": 3,
-        "lr": 0.001,
-        "verbose": True
-    }
+        model_config = ModelConfig(
+            embedding_dim=50,
+            num_classes=5
+        )
 
-    extra_trainer_params = {
-        "enable_progress_bar": True,
-        
-    }
-    
+    # Create classifier
+    print("   🔨 Creating classifier...")
+    classifier = torchTextClassifiers(
+        tokenizer=tokenizer,
+        model_config=model_config
+    )
+    print("   ✅ Classifier created successfully!")
+
+    # Training configuration
+    training_config = TrainingConfig(
+        num_epochs=50,
+        batch_size=128,
+        lr=0.001,
+        patience_early_stopping=3,
+        num_workers=0,
+        trainer_params={
+            'enable_progress_bar': True,
+            'deterministic': True
+        }
+    )
+
     # Create and build model
     start_time = time.time()
-    
-    classifier = create_fasttext(**model_params)
-    classifier.build(X_train, y_train)
-    
-    # Train model - disable logging to save disk space
+
+    # Train model
+    print("   🎯 Training model...")
     classifier.train(
-        X_train, y_train, X_val, y_val, **train_params,
-        trainer_params=extra_trainer_params
+        X_train, y_train, X_val, y_val,
+        training_config=training_config,
+        verbose=True
     )
     training_time = time.time() - start_time
-    
+
     # Handle predictions based on model type
     if use_categorical:
-        # Skip validation for mixed model due to categorical prediction bug
         print("   ✅ Running validation for text-with-categorical-variables model...")
         try:
-            test_accuracy = classifier.validate(X_test, y_test)
-            predictions = classifier.predict(X_test)
+            result = classifier.predict(X_test)
+            predictions = result["prediction"].squeeze().numpy()
+            test_accuracy = (predictions == y_test).mean()
             print(f"   Test accuracy: {test_accuracy:.3f}")
         except Exception as e:
             print(f"   ⚠️  Validation failed: {e}")
-            train_accuracy = 0.0
             test_accuracy = 0.0
             predictions = np.zeros(len(y_test))
     else:
         # Text-only model works fine for predictions
         print("   ✅ Running validation for text-only model...")
         try:
-            test_accuracy = classifier.validate(X_test, y_test)
-            predictions = classifier.predict(X_test)
+            result = classifier.predict(X_test)
+            predictions = result["prediction"].squeeze().numpy()
+            test_accuracy = (predictions == y_test).mean()
             print(f"   Test accuracy: {test_accuracy:.3f}")
         except Exception as e:
             print(f"   ⚠️  Validation failed: {e}")
-            train_accuracy = 0.0
             test_accuracy = 0.0
             predictions = np.zeros(len(y_test))
     
@@ -236,11 +214,34 @@ def train_and_evaluate_model(X, y, model_name, use_categorical=False, use_simple
 
 
 def main():
-    print("🔀 FastText Classifier: Categorical Features Comparison")
+    # Set seed for reproducibility
+    SEED = 42
+
+    # Set environment variables for full reproducibility
+    os.environ['PYTHONHASHSEED'] = str(SEED)
+    os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
+
+    # Use PyTorch Lightning's seed_everything for comprehensive seeding
+    seed_everything(SEED, workers=True)
+
+    # Make PyTorch operations deterministic
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    torch.use_deterministic_algorithms(True, warn_only=True)
+
+    # Suppress PyTorch Lightning warnings for cleaner output
+    warnings.filterwarnings(
+        'ignore',
+        message='.*',
+        category=UserWarning,
+        module='pytorch_lightning'
+    )
+
+    print("🔀 Classifier: Categorical Features Comparison")
     print("=" * 60)
-    print("Comparing FastText performance with and without categorical features")
+    print("Comparing performance with and without categorical features")
     print()
-    
+
     # Load and prepare data (same as notebook)
     X_text_only, X_mixed, y, encoder = load_and_prepare_data()
     
@@ -250,17 +251,17 @@ def main():
     
     # Text-only model
     results_text_only = train_and_evaluate_model(
-        X_text_only, y, "Text-Only FastText", use_categorical=False
-    )
-    
-    # Mixed model (text + categorical)
-    results_mixed = train_and_evaluate_model(
-        X_mixed, y, "Mixed Features FastText", use_categorical=True
+        X_text_only, y, "Text-Only Classifier", use_categorical=False
     )
 
-    # TF-IDF classifier
-    results_tfidf = train_and_evaluate_model(X_text_only, y, "TF-IDF classifier", use_categorical=False, use_simple=True)
-    
+    # Mixed model (text + categorical)
+    results_mixed = train_and_evaluate_model(
+        X_mixed, y, "Mixed Features Classifier", use_categorical=True
+    )
+
+    # Note: TF-IDF classifier (SimpleTextWrapper) is not available in the current version
+    # results_tfidf = train_and_evaluate_model(X_text_only, y, "TF-IDF classifier", use_categorical=False, use_simple=True)
+
     # Compare results
     print(f"\n📊 Results Comparison:")
     print("=" * 50)
@@ -270,8 +271,6 @@ def main():
           f"{results_text_only['test_accuracy']:<11.3f} {results_text_only['training_time']:<10.1f}")
     print(f"{'Mixed Features':<25} "
           f"{results_mixed['test_accuracy']:<11.3f} {results_mixed['training_time']:<10.1f}")
-    print(f"{'TF-IDF':<25} "
-          f"{results_tfidf['test_accuracy']:<11.3f} {results_tfidf['training_time']:<10.1f}")
     # Calculate improvements
     acc_improvement = results_mixed['test_accuracy'] - results_text_only['test_accuracy']
     time_overhead = results_mixed['training_time'] - results_text_only['training_time']
