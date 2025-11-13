@@ -6,13 +6,44 @@ custom PyTorch Lightning trainer parameters, different optimizers,
 and training monitoring.
 """
 
+import os
+import random
+import warnings
+
 import numpy as np
-from torchTextClassifiers import create_fasttext
+import torch
+from pytorch_lightning import seed_everything
+
+from torchTextClassifiers import ModelConfig, TrainingConfig, torchTextClassifiers
+from torchTextClassifiers.tokenizers import WordPieceTokenizer
 
 def main():
+    # Set seed for reproducibility
+    SEED = 42
+
+    # Set environment variables for full reproducibility
+    os.environ['PYTHONHASHSEED'] = str(SEED)
+    os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8'
+
+    # Use PyTorch Lightning's seed_everything for comprehensive seeding
+    seed_everything(SEED, workers=True)
+
+    # Make PyTorch operations deterministic
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    torch.use_deterministic_algorithms(True, warn_only=True)
+
+    # Suppress PyTorch Lightning warnings for cleaner output
+    warnings.filterwarnings(
+        'ignore',
+        message='.*',
+        category=UserWarning,
+        module='pytorch_lightning'
+    )
+
     print("⚙️ Advanced Training Configuration Example")
     print("=" * 50)
-    
+
     # Create a larger dataset for demonstrating advanced training
     print("📝 Creating training dataset...")
     
@@ -67,54 +98,63 @@ def main():
     print(f"Training samples: {len(X_train)}")
     print(f"Validation samples: {len(X_val)}")
     print(f"Test samples: {len(X_test)}")
-    
-    # Create FastText classifier
-    print("\n🏗️ Creating FastText classifier...")
-    classifier = create_fasttext(
-        embedding_dim=100,
-        sparse=False,
-        num_tokens=10000,
-        min_count=1,
-        min_n=3,
-        max_n=6,
-        len_word_ngrams=2,
-        num_classes=2
-    )
-    
-    # Build the model
-    print("\n🔨 Building model...")
-    classifier.build(X_train, y_train)
-    print("✅ Model built successfully!")
-    
+
+    # Create and train tokenizer (shared across all examples)
+    print("\n🏗️ Creating and training WordPiece tokenizer...")
+    tokenizer = WordPieceTokenizer(vocab_size=5000, output_dim=128)
+    training_corpus = X_train.tolist()
+    tokenizer.train(training_corpus)
+    print("✅ Tokenizer trained successfully!")
+
     # Example 1: Basic training with default settings
     print("\n🎯 Example 1: Basic training with default settings...")
-    classifier.train(
-        X_train, y_train, X_val, y_val,
+
+    model_config = ModelConfig(
+        embedding_dim=100,
+        num_classes=2
+    )
+
+    classifier = torchTextClassifiers(
+        tokenizer=tokenizer,
+        model_config=model_config
+    )
+    print("✅ Classifier created successfully!")
+
+    training_config = TrainingConfig(
         num_epochs=15,
         batch_size=8,
-        patience_train=5,
+        lr=1e-3,
+        patience_early_stopping=5,
+        num_workers=0,
+        trainer_params={'deterministic': True}
+    )
+
+    classifier.train(
+        X_train, y_train, X_val, y_val,
+        training_config=training_config,
         verbose=True
     )
-    
-    basic_accuracy = classifier.validate(X_test, y_test)
+
+    result = classifier.predict(X_test)
+    basic_predictions = result["prediction"].squeeze().numpy()
+    basic_accuracy = (basic_predictions == y_test).mean()
     print(f"✅ Basic training completed! Accuracy: {basic_accuracy:.3f}")
     
     # Example 2: Advanced training with custom Lightning trainer parameters
     print("\n🚀 Example 2: Advanced training with custom parameters...")
-    
+
     # Create a new classifier for comparison
-    advanced_classifier = create_fasttext(
+    advanced_model_config = ModelConfig(
         embedding_dim=100,
-        sparse=False,
-        num_tokens=10000,
-        min_count=1,
-        min_n=3,
-        max_n=6,
-        len_word_ngrams=2,
         num_classes=2
     )
-    advanced_classifier.build(X_train, y_train)
-    
+
+    advanced_classifier = torchTextClassifiers(
+        tokenizer=tokenizer,
+        model_config=advanced_model_config
+    )
+    print("✅ Advanced classifier created successfully!")
+
     # Custom trainer parameters for advanced features
     advanced_trainer_params = {
         'accelerator': 'auto',  # Use GPU if available, else CPU
@@ -125,62 +165,77 @@ def main():
         'enable_progress_bar': True,  # Show progress bar
         'log_every_n_steps': 5,  # Log every 5 steps
     }
-    
-    advanced_classifier.train(
-        X_train, y_train, X_val, y_val,
+
+    advanced_training_config = TrainingConfig(
         num_epochs=20,
         batch_size=4,  # Smaller batch size with grad accumulation
-        patience_train=7,
-        trainer_params=advanced_trainer_params,
+        lr=1e-3,
+        patience_early_stopping=7,
+        num_workers=0,
+        cpu_run=False,  # Don't override accelerator from trainer_params
+        trainer_params=advanced_trainer_params
+    )
+
+    advanced_classifier.train(
+        X_train, y_train, X_val, y_val,
+        training_config=advanced_training_config,
         verbose=True
     )
-    
-    advanced_accuracy = advanced_classifier.validate(X_test, y_test)
+
+    advanced_result = advanced_classifier.predict(X_test)
+    advanced_predictions = advanced_result["prediction"].squeeze().numpy()
+    advanced_accuracy = (advanced_predictions == y_test).mean()
     print(f"✅ Advanced training completed! Accuracy: {advanced_accuracy:.3f}")
     
     # Example 3: Training with CPU-only (useful for small datasets or debugging)
     print("\n💻 Example 3: CPU-only training...")
-    
-    cpu_classifier = create_fasttext(
+
+    cpu_model_config = ModelConfig(
         embedding_dim=64,  # Smaller embedding for faster CPU training
-        sparse=True,       # Sparse embeddings for efficiency
-        num_tokens=5000,
-        min_count=1,
-        min_n=3,
-        max_n=6,
-        len_word_ngrams=2,
         num_classes=2
     )
-    cpu_classifier.build(X_train, y_train)
-    
-    cpu_classifier.train(
-        X_train, y_train, X_val, y_val,
+
+    cpu_classifier = torchTextClassifiers(
+        tokenizer=tokenizer,
+        model_config=cpu_model_config
+    )
+    print("✅ CPU classifier created successfully!")
+
+    cpu_training_config = TrainingConfig(
         num_epochs=10,
         batch_size=16,  # Larger batch size for CPU
-        cpu_run=True,   # Force CPU usage
+        lr=1e-3,
+        patience_early_stopping=3,
+        cpu_run=False,  # Don't override accelerator from trainer_params
         num_workers=0,  # No multiprocessing for CPU
-        patience_train=3,
+        trainer_params={'deterministic': True, 'accelerator': 'cpu'}
+    )
+
+    cpu_classifier.train(
+        X_train, y_train, X_val, y_val,
+        training_config=cpu_training_config,
         verbose=True
     )
-    
-    cpu_accuracy = cpu_classifier.validate(X_test, y_test)
+
+    cpu_result = cpu_classifier.predict(X_test)
+    cpu_predictions = cpu_result["prediction"].squeeze().numpy()
+    cpu_accuracy = (cpu_predictions == y_test).mean()
     print(f"✅ CPU training completed! Accuracy: {cpu_accuracy:.3f}")
     
     # Example 4: Custom training with specific Lightning callbacks
     print("\n🔧 Example 4: Training with custom callbacks...")
-    
-    custom_classifier = create_fasttext(
+
+    custom_model_config = ModelConfig(
         embedding_dim=128,
-        sparse=False,
-        num_tokens=8000,
-        min_count=1,
-        min_n=3,
-        max_n=6,
-        len_word_ngrams=2,
         num_classes=2
     )
-    custom_classifier.build(X_train, y_train)
-    
+
+    custom_classifier = torchTextClassifiers(
+        tokenizer=tokenizer,
+        model_config=custom_model_config
+    )
+    print("✅ Custom classifier created successfully!")
+
     # Custom trainer with specific monitoring and checkpointing
     custom_trainer_params = {
         'max_epochs': 25,
@@ -189,18 +244,27 @@ def main():
         'check_val_every_n_epoch': 2,  # Validate every 2 epochs
         'enable_checkpointing': True,
         'enable_model_summary': True,
+        'deterministic': True,
     }
-    
-    custom_classifier.train(
-        X_train, y_train, X_val, y_val,
+
+    custom_training_config = TrainingConfig(
         num_epochs=25,
         batch_size=6,
-        patience_train=8,
-        trainer_params=custom_trainer_params,
+        lr=1e-3,
+        patience_early_stopping=8,
+        num_workers=0,
+        trainer_params=custom_trainer_params
+    )
+
+    custom_classifier.train(
+        X_train, y_train, X_val, y_val,
+        training_config=custom_training_config,
         verbose=True
     )
-    
-    custom_accuracy = custom_classifier.validate(X_test, y_test)
+
+    custom_result = custom_classifier.predict(X_test)
+    custom_predictions = custom_result["prediction"].squeeze().numpy()
+    custom_accuracy = (custom_predictions == y_test).mean()
     print(f"✅ Custom training completed! Accuracy: {custom_accuracy:.3f}")
     
     # Compare all training approaches
