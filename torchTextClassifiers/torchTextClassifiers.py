@@ -68,7 +68,7 @@ class TrainingConfig:
     loss: torch.nn.Module = field(default_factory=lambda: torch.nn.CrossEntropyLoss())
     optimizer: Type[torch.optim.Optimizer] = torch.optim.Adam
     scheduler: Optional[Type[torch.optim.lr_scheduler._LRScheduler]] = None
-    cpu_run: bool = False
+    accelerator: str = "auto"
     num_workers: int = 12
     patience_early_stopping: int = 3
     dataloader_params: Optional[dict] = None
@@ -237,13 +237,10 @@ class torchTextClassifiers:
         if verbose:
             logger.info("Starting training process...")
 
-        # Device setup
-        if training_config.cpu_run:
-            device = torch.device("cpu")
-            accelerator = "cpu"
-        else:
+        if training_config.accelerator == "auto":
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            accelerator = "gpu" if torch.cuda.is_available() else "cpu"
+        else:
+            device = torch.device(training_config.accelerator)
 
         self.device = device
 
@@ -311,6 +308,7 @@ class torchTextClassifiers:
         ]
 
         trainer_params = {
+            "accelerator": training_config.accelerator,
             "callbacks": callbacks,
             "max_epochs": training_config.num_epochs,
             "num_sanity_val_steps": 2,
@@ -322,7 +320,7 @@ class torchTextClassifiers:
         if training_config.trainer_params is not None:
             trainer_params.update(training_config.trainer_params)
 
-        trainer = pl.Trainer(**trainer_params, accelerator=accelerator)
+        trainer = pl.Trainer(**trainer_params)
 
         torch.cuda.empty_cache()
         torch.set_float32_matmul_precision("medium")
