@@ -175,3 +175,5 @@ poetry.lock
 
 # vscode
 .vscode/
+
+benchmark_results/
