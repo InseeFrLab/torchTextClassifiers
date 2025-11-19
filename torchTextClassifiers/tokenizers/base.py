@@ -124,12 +124,13 @@ class HuggingFaceTokenizer(BaseTokenizer):
 
         # Pad to longest sequence if no output_dim is specified
         padding = True if self.output_dim is None else "max_length"
+        truncation = True if self.output_dim is not None else False
 
         tokenize_output = self.tokenizer(
             text,
             padding=padding,
             return_tensors="pt",
-            truncation=True,
+            truncation=truncation,
             max_length=self.output_dim,
             return_offsets_mapping=return_offsets_mapping,
         )  # method from PreTrainedTokenizerFast
