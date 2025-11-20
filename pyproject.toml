@@ -47,7 +47,7 @@ docs = [
 [project.optional-dependencies]
 explainability = ["unidecode", "nltk", "captum"]
 preprocess =     ["unidecode", "nltk"]
-hf-dep = [
+huggingface = [
     "tokenizers>=0.22.1",
     "transformers>=4.57.1",
     "datasets>=4.3.0",
