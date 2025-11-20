@@ -125,10 +125,11 @@ class torchTextClassifiers:
         self.model_config = model_config
         self.tokenizer = tokenizer
 
-        if not self.tokenizer.trained:
-            raise RuntimeError(
-                f"Tokenizer {type(self.tokenizer)} must be trained before initializing the classifier."
-            )
+        if hasattr(self.tokenizer, "trained"):
+            if not self.tokenizer.trained:
+                raise RuntimeError(
+                    f"Tokenizer {type(self.tokenizer)} must be trained before initializing the classifier."
+                )
 
         self.vocab_size = tokenizer.vocab_size
         self.embedding_dim = model_config.embedding_dim
