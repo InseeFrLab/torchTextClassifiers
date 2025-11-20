@@ -6,7 +6,7 @@ from torchTextClassifiers.tokenizers import HAS_HF, HuggingFaceTokenizer
 
 if not HAS_HF:
     raise ImportError(
-        "The HuggingFace dependencies are needed to use this tokenizer. Please run 'uv add torchTextClassifiers --group hf-dep."
+        "The HuggingFace dependencies are needed to use this tokenizer. Please run 'uv add torchTextClassifiers --extra huggingface."
     )
 else:
     from tokenizers import (
