@@ -2242,7 +2242,7 @@ explainability = [
     { name = "nltk" },
     { name = "unidecode" },
 ]
-hf-dep = [
+huggingface = [
     { name = "datasets" },
     { name = "tokenizers" },
     { name = "transformers" },
@@ -2278,17 +2278,17 @@ docs = [
 [package.metadata]
 requires-dist = [
     { name = "captum", marker = "extra == 'explainability'" },
-    { name = "datasets", marker = "extra == 'hf-dep'", specifier = ">=4.3.0" },
+    { name = "datasets", marker = "extra == 'huggingface'", specifier = ">=4.3.0" },
     { name = "nltk", marker = "extra == 'explainability'" },
     { name = "nltk", marker = "extra == 'preprocess'" },
     { name = "numpy", specifier = ">=1.26.4" },
     { name = "pytorch-lightning", specifier = ">=2.4.0" },
-    { name = "tokenizers", marker = "extra == 'hf-dep'", specifier = ">=0.22.1" },
-    { name = "transformers", marker = "extra == 'hf-dep'", specifier = ">=4.57.1" },
+    { name = "tokenizers", marker = "extra == 'huggingface'", specifier = ">=0.22.1" },
+    { name = "transformers", marker = "extra == 'huggingface'", specifier = ">=4.57.1" },
     { name = "unidecode", marker = "extra == 'explainability'" },
     { name = "unidecode", marker = "extra == 'preprocess'" },
 ]
-provides-extras = ["explainability", "preprocess", "hf-dep"]
+provides-extras = ["explainability", "preprocess", "huggingface"]
 
 [package.metadata.requires-dev]
 dev = [
