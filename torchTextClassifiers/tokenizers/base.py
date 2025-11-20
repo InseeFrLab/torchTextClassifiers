@@ -65,7 +65,11 @@ class TokenizerOutput:
 
 class BaseTokenizer(ABC):
     def __init__(
-        self, vocab_size: int, output_vectorized: bool = False, output_dim: Optional[int] = None
+        self,
+        vocab_size: int,
+        padding_idx: int,
+        output_vectorized: bool = False,
+        output_dim: Optional[int] = None,
     ):
         """
         Base class for tokenizers.
@@ -78,6 +82,7 @@ class BaseTokenizer(ABC):
         self.vocab_size = vocab_size
         self.output_vectorized = output_vectorized
         self.output_dim = output_dim
+        self.padding_idx = padding_idx
         if self.output_vectorized:
             if output_dim is None:
                 raise ValueError(
