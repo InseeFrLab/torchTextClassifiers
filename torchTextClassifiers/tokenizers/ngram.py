@@ -274,7 +274,7 @@ class NGramTokenizer(BaseTokenizer):
         self.eos_token_id = 2
 
         if training_text is not None:
-            self._build_vocab(training_text)
+            self.train(training_text)
         else:
             self.word_to_id = {}
             self.id_to_word = {}
