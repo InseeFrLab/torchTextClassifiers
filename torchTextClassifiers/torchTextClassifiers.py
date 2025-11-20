@@ -460,6 +460,7 @@ class torchTextClassifiers:
 
         if explain:
             return_offsets_mapping = True  # to be passed to the tokenizer
+            return_word_ids = True
             if self.pytorch_model.text_embedder is None:
                 raise RuntimeError(
                     "Explainability is not supported when the tokenizer outputs vectorized text directly. Please use a tokenizer that outputs token IDs."
@@ -474,6 +475,7 @@ class torchTextClassifiers:
                 )  # initialize a Captum layer gradient integrator
         else:
             return_offsets_mapping = False
+            return_word_ids = False
 
         X_test = self._check_X(X_test)
         text = X_test["text"]
@@ -482,7 +484,9 @@ class torchTextClassifiers:
         self.pytorch_model.eval().cpu()
 
         tokenize_output = self.tokenizer.tokenize(
-            text.tolist(), return_offsets_mapping=return_offsets_mapping
+            text.tolist(),
+            return_offsets_mapping=return_offsets_mapping,
+            return_word_ids=return_word_ids,
         )
 
         if not isinstance(tokenize_output, TokenizerOutput):

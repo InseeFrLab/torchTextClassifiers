@@ -122,7 +122,10 @@ class HuggingFaceTokenizer(BaseTokenizer):
         self.output_dim = output_dim  # constant context size for all batch
 
     def tokenize(
-        self, text: Union[str, List[str]], return_offsets_mapping: Optional[bool] = False
+        self,
+        text: Union[str, List[str]],
+        return_offsets_mapping: Optional[bool] = False,
+        return_word_ids: Optional[bool] = False,
     ) -> list:
         if not self.trained:
             raise RuntimeError("Tokenizer must be trained before tokenization.")
@@ -142,11 +145,16 @@ class HuggingFaceTokenizer(BaseTokenizer):
 
         encoded_text = tokenize_output["input_ids"]
 
+        if return_word_ids:
+            word_ids = np.array([tokenize_output.word_ids(i) for i in range(len(encoded_text))])
+        else:
+            word_ids = None
+
         return TokenizerOutput(
             input_ids=encoded_text,
             attention_mask=tokenize_output["attention_mask"],
             offset_mapping=tokenize_output.get("offset_mapping", None),
-            word_ids=np.array([tokenize_output.word_ids(i) for i in range(len(encoded_text))]),
+            word_ids=word_ids,
         )
 
     @classmethod
