@@ -113,7 +113,7 @@ class HuggingFaceTokenizer(BaseTokenizer):
         trained: bool = False,
     ):
         super().__init__(
-            vocab_size, output_vectorized=False, output_dim=output_dim
+            vocab_size, output_vectorized=False, output_dim=output_dim, padding_idx=padding_idx
         )  # it outputs token ids and not vectors
 
         self.trained = trained
