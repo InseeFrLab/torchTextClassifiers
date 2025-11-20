@@ -282,6 +282,7 @@ class NGramTokenizer(BaseTokenizer):
             self.subword_cache = None
 
         self.vocab_size = 3 + self.nwords + self.num_tokens
+        print("brrrrr ", self.vocab_size)
         super().__init__(
             vocab_size=self.vocab_size, padding_idx=self.pad_token_id, output_dim=output_dim
         )
@@ -301,6 +302,7 @@ class NGramTokenizer(BaseTokenizer):
                 idx += 1
 
         self.nwords = len(self.word_to_id)
+        self.vocab_size = 3 + self.nwords + self.num_tokens
 
         # Create reverse mapping
         self.id_to_word = {v: k for k, v in self.word_to_id.items()}
