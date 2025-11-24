@@ -100,6 +100,7 @@ class torchTextClassifiers:
         self,
         tokenizer: BaseTokenizer,
         model_config: ModelConfig,
+        ragged_multilabel: bool = False,
     ):
         """Initialize the torchTextClassifiers instance.
 
@@ -124,6 +125,7 @@ class torchTextClassifiers:
 
         self.model_config = model_config
         self.tokenizer = tokenizer
+        self.ragged_multilabel = ragged_multilabel
 
         if hasattr(self.tokenizer, "trained"):
             if not self.tokenizer.trained:
@@ -249,6 +251,11 @@ class torchTextClassifiers:
         if training_config.optimizer_params is not None:
             optimizer_params.update(training_config.optimizer_params)
 
+        if training_config.loss is torch.nn.CrossEntropyLoss and self.ragged_multilabel:
+            logger.warning(
+                "⚠️ You have set ragged_multilabel to True but are using CrossEntropyLoss. We would recommend to use torch.nn.BCEWithLogitsLoss for multilabel classification tasks."
+            )
+
         self.lightning_module = TextClassificationModule(
             model=self.pytorch_model,
             loss=training_config.loss,
@@ -271,12 +278,14 @@ class torchTextClassifiers:
             categorical_variables=X_train["categorical_variables"],  # None if no cat vars
             tokenizer=self.tokenizer,
             labels=y_train,
+            ragged_multilabel=self.ragged_multilabel,
         )
         val_dataset = TextClassificationDataset(
             texts=X_val["text"],
             categorical_variables=X_val["categorical_variables"],  # None if no cat vars
             tokenizer=self.tokenizer,
             labels=y_val,
+            ragged_multilabel=self.ragged_multilabel,
         )
 
         train_dataloader = train_dataset.create_dataloader(
@@ -352,7 +361,7 @@ class torchTextClassifiers:
         X = self._check_X(X)
         Y = self._check_Y(Y)
 
-        if X["text"].shape[0] != Y.shape[0]:
+        if X["text"].shape[0] != len(Y):
             raise ValueError("X_train and y_train must have the same number of observations.")
 
         return X, Y
@@ -422,22 +431,32 @@ class torchTextClassifiers:
         return {"text": text, "categorical_variables": categorical_variables}
 
     def _check_Y(self, Y):
-        assert isinstance(Y, np.ndarray), "Y must be a numpy array of shape (N,) or (N,1)."
-        assert len(Y.shape) == 1 or (
-            len(Y.shape) == 2 and Y.shape[1] == 1
-        ), "Y must be a numpy array of shape (N,) or (N,1)."
+        if self.ragged_multilabel:
+            assert isinstance(
+                Y, list
+            ), "Y must be a list of lists for ragged multilabel classification."
+            for row in Y:
+                assert isinstance(row, list), "Each element of Y must be a list of labels."
 
-        try:
-            Y = Y.astype(int)
-        except ValueError:
-            logger.error("Y must be castable in integer format.")
+            return Y
 
-        if Y.max() >= self.num_classes or Y.min() < 0:
-            raise ValueError(
-                f"Y contains class labels outside the range [0, {self.num_classes - 1}]."
-            )
+        else:
+            assert isinstance(Y, np.ndarray), "Y must be a numpy array of shape (N,) or (N,1)."
+            assert len(Y.shape) == 1 or (
+                len(Y.shape) == 2 and Y.shape[1] == 1
+            ), "Y must be a numpy array of shape (N,) or (N,1)."
 
-        return Y
+            try:
+                Y = Y.astype(int)
+            except ValueError:
+                logger.error("Y must be castable in integer format.")
+
+            if Y.max() >= self.num_classes or Y.min() < 0:
+                raise ValueError(
+                    f"Y contains class labels outside the range [0, {self.num_classes - 1}]."
+                )
+
+            return Y
 
     def predict(
         self,
