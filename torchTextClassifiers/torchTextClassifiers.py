@@ -184,9 +184,9 @@ class torchTextClassifiers:
         self,
         X_train: np.ndarray,
         y_train: np.ndarray,
-        X_val: np.ndarray,
-        y_val: np.ndarray,
         training_config: TrainingConfig,
+        X_val: Optional[np.ndarray] = None,
+        y_val: Optional[np.ndarray] = None,
         verbose: bool = False,
     ) -> None:
         """Train the classifier using PyTorch Lightning.
@@ -224,7 +224,14 @@ class torchTextClassifiers:
         """
         # Input validation
         X_train, y_train = self._check_XY(X_train, y_train)
-        X_val, y_val = self._check_XY(X_val, y_val)
+
+        if X_val is not None:
+            assert y_val is not None, "y_val must be provided if X_val is provided."
+        if y_val is not None:
+            assert X_val is not None, "X_val must be provided if y_val is provided."
+
+        if X_val is not None and y_val is not None:
+            X_val, y_val = self._check_XY(X_val, y_val)
 
         if (
             X_train["categorical_variables"] is not None
@@ -277,40 +284,43 @@ class torchTextClassifiers:
             texts=X_train["text"],
             categorical_variables=X_train["categorical_variables"],  # None if no cat vars
             tokenizer=self.tokenizer,
-            labels=y_train,
+            labels=y_train.tolist(),
             ragged_multilabel=self.ragged_multilabel,
         )
-        val_dataset = TextClassificationDataset(
-            texts=X_val["text"],
-            categorical_variables=X_val["categorical_variables"],  # None if no cat vars
-            tokenizer=self.tokenizer,
-            labels=y_val,
-            ragged_multilabel=self.ragged_multilabel,
-        )
-
         train_dataloader = train_dataset.create_dataloader(
             batch_size=training_config.batch_size,
             num_workers=training_config.num_workers,
             shuffle=True,
             **training_config.dataloader_params if training_config.dataloader_params else {},
         )
-        val_dataloader = val_dataset.create_dataloader(
-            batch_size=training_config.batch_size,
-            num_workers=training_config.num_workers,
-            shuffle=False,
-            **training_config.dataloader_params if training_config.dataloader_params else {},
-        )
+
+        if X_val is not None and y_val is not None:
+            val_dataset = TextClassificationDataset(
+                texts=X_val["text"],
+                categorical_variables=X_val["categorical_variables"],  # None if no cat vars
+                tokenizer=self.tokenizer,
+                labels=y_val,
+                ragged_multilabel=self.ragged_multilabel,
+            )
+            val_dataloader = val_dataset.create_dataloader(
+                batch_size=training_config.batch_size,
+                num_workers=training_config.num_workers,
+                shuffle=False,
+                **training_config.dataloader_params if training_config.dataloader_params else {},
+            )
+        else:
+            val_dataloader = None
 
         # Setup trainer
         callbacks = [
             ModelCheckpoint(
-                monitor="val_loss",
+                monitor="val_loss" if val_dataloader is not None else "train_loss",
                 save_top_k=1,
                 save_last=False,
                 mode="min",
             ),
             EarlyStopping(
-                monitor="val_loss",
+                monitor="val_loss" if val_dataloader is not None else "train_loss",
                 patience=training_config.patience_early_stopping,
                 mode="min",
             ),
@@ -442,9 +452,9 @@ class torchTextClassifiers:
 
         else:
             assert isinstance(Y, np.ndarray), "Y must be a numpy array of shape (N,) or (N,1)."
-            assert len(Y.shape) == 1 or (
-                len(Y.shape) == 2 and Y.shape[1] == 1
-            ), "Y must be a numpy array of shape (N,) or (N,1)."
+            assert (
+                len(Y.shape) == 1 or len(Y.shape) == 2
+            ), "Y must be a numpy array of shape (N,) or (N, num_labels)."
 
             try:
                 Y = Y.astype(int)
