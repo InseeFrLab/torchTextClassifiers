@@ -1,3 +1,4 @@
+import logging
 import os
 from typing import List, Union
 
@@ -8,6 +9,7 @@ from torch.utils.data import DataLoader, Dataset
 from torchTextClassifiers.tokenizers import BaseTokenizer
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
+logger = logging.getLogger(__name__)
 
 
 class TextClassificationDataset(Dataset):
@@ -16,7 +18,8 @@ class TextClassificationDataset(Dataset):
         texts: List[str],
         categorical_variables: Union[List[List[int]], np.array, None],
         tokenizer: BaseTokenizer,
-        labels: Union[List[int], None] = None,
+        labels: Union[List[int], List[List[int]], np.array, None] = None,
+        ragged_multilabel: bool = False,
     ):
         self.categorical_variables = categorical_variables
 
@@ -32,6 +35,23 @@ class TextClassificationDataset(Dataset):
         self.texts = texts
         self.tokenizer = tokenizer
         self.labels = labels
+        self.ragged_multilabel = ragged_multilabel
+
+        if self.ragged_multilabel and self.labels is not None:
+            max_value = int(max(max(row) for row in labels if row))
+            self.num_classes = max_value + 1
+
+            if max_value == 1:
+                try:
+                    labels = np.array(labels)
+                    logger.critical(
+                        """ragged_multilabel set to True but max label value is 1 and all samples have the same number of labels.
+                        If your labels are already one-hot encoded, set ragged_multilabel to False. Otherwise computations are likely to be wrong."""
+                    )
+                except ValueError:
+                    logger.warning(
+                        "ragged_multilabel set to True but max label value is 1. If your labels are already one-hot encoded, set ragged_multilabel to False. Otherwise computations are likely to be wrong."
+                    )
 
     def __len__(self):
         return len(self.texts)
@@ -59,10 +79,28 @@ class TextClassificationDataset(Dataset):
             )
 
     def collate_fn(self, batch):
-        text, *categorical_vars, y = zip(*batch)
+        text, *categorical_vars, labels = zip(*batch)
 
         if self.labels is not None:
-            labels_tensor = torch.tensor(y, dtype=torch.long)
+            if self.ragged_multilabel:
+                # Pad labels to the max length in the batch
+                labels_padded = torch.nn.utils.rnn.pad_sequence(
+                    [torch.tensor(label) for label in labels],
+                    batch_first=True,
+                    padding_value=-1,  # use impossible class
+                ).int()
+
+                labels_tensor = torch.zeros(labels_padded.size(0), 6).float()
+                mask = labels_padded != -1
+
+                batch_size = labels_padded.size(0)
+                rows = torch.arange(batch_size).unsqueeze(1).expand_as(labels_padded)[mask]
+                cols = labels_padded[mask]
+
+                labels_tensor[rows, cols] = 1
+
+            else:
+                labels_tensor = torch.tensor(labels, dtype=torch.long)
         else:
             labels_tensor = None
 
