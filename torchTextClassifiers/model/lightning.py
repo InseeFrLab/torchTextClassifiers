@@ -76,6 +76,10 @@ class TextClassificationModule(pl.LightningModule):
         targets = batch["labels"]
 
         outputs = self.forward(batch)
+
+        if isinstance(self.loss, torch.nn.BCEWithLogitsLoss):
+            targets = targets.float()
+
         loss = self.loss(outputs, targets)
         self.log("train_loss", loss, on_epoch=True, on_step=True, prog_bar=True)
         accuracy = self.accuracy_fn(outputs, targets)

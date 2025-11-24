@@ -100,7 +100,7 @@ class TextClassificationDataset(Dataset):
                 labels_tensor[rows, cols] = 1
 
             else:
-                labels_tensor = torch.tensor(labels, dtype=torch.long)
+                labels_tensor = torch.tensor(labels)
         else:
             labels_tensor = None
 
