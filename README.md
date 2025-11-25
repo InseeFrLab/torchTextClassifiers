@@ -1,6 +1,6 @@
 # torchTextClassifiers
 
-[![Documentation](https://img.shields.io/badge/docs-latest-blue.svg)](https://inseeflab.github.io/torchTextClassifiers/)
+[![Documentation](https://img.shields.io/badge/docs-latest-blue.svg)](https://inseefrlab.github.io/torchTextClassifiers/)
 
 A unified, extensible framework for text classification with categorical variables built on [PyTorch](https://pytorch.org/) and [PyTorch Lightning](https://lightning.ai/docs/pytorch/stable/).
 
@@ -57,4 +57,5 @@ See the [examples/](examples/) directory for:
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
 
