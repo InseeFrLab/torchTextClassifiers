@@ -4,7 +4,7 @@ torchTextClassifiers is a **modular, component-based framework** for text classi
 
 ## The Pipeline
 
-At its core, torch Text Classifiers processes data through a simple pipeline:
+At its core, torchTextClassifiers processes data through a simple pipeline:
 
 ```{mermaid}
 flowchart LR
@@ -617,3 +617,4 @@ torchTextClassifiers provides a **component-based pipeline** for text classifica
 - **Examples**: Explore complete examples in the repository
 
 Ready to build your classifier? Start with {doc}`../getting_started/quickstart`!
+
