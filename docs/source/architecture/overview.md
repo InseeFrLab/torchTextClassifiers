@@ -270,7 +270,7 @@ custom_head = nn.Sequential(
     nn.Linear(64, 5)
 )
 
-head = ClassificationHead(linear=custom_head)
+head = ClassificationHead(net=custom_head)
 ```
 
 ## Complete Architecture
@@ -610,4 +610,5 @@ torchTextClassifiers provides a **component-based pipeline** for text classifica
 - **Examples**: Explore complete examples in the repository
 
 Ready to build your classifier? Start with {doc}`../getting_started/quickstart`!
+
 
