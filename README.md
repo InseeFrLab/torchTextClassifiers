@@ -1,5 +1,7 @@
 # torchTextClassifiers
 
+[![Documentation](https://img.shields.io/badge/docs-latest-blue.svg)](https://inseeflab.github.io/torchTextClassifiers/)
+
 A unified, extensible framework for text classification with categorical variables built on [PyTorch](https://pytorch.org/) and [PyTorch Lightning](https://lightning.ai/docs/pytorch/stable/).
 
 ## 🚀 Features
@@ -29,6 +31,16 @@ uv sync
 # Or install with pip
 pip install -e .
 ```
+
+## 📖 Documentation
+
+Full documentation is available at: **https://inseeflab.github.io/torchTextClassifiers/**
+
+The documentation includes:
+- **Getting Started**: Installation and quick start guide
+- **Architecture**: Understanding the 3-layer design
+- **Tutorials**: Step-by-step guides for different use cases
+- **API Reference**: Complete API documentation
 
 ## 📝 Usage
 

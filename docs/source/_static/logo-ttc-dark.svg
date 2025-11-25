@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160">
+  <!-- Outer rounded square -->
+  <rect x="8" y="8" width="144" height="120" rx="18"
+        fill="none" stroke="#ced6dd" stroke-width="8"/>
+
+  <!-- Text lines (representing text) -->
+  <rect x="32" y="44" width="60" height="10" rx="2" fill="#334155"/>
+  <rect x="32" y="62" width="48" height="10" rx="2" fill="#64748B"/>
+  <rect x="32" y="80" width="56" height="10" rx="2" fill="#94A3B8"/>
+
+  <!-- Lightning bolt (Lightning AI) -->
+  <polygon points="108,24 92,60 116,60 98,102 132,52 112,52"
+           fill="#EE4C2C"/>
+
+ 
+</svg>
