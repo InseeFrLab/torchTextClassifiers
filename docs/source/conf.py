@@ -30,8 +30,10 @@ extensions = [
     'myst_parser',                  # Parse Markdown files
     'sphinx_design',                # Modern UI components (cards, grids, etc.)
     'nbsphinx',                     # Render Jupyter notebooks
-    'sphinxcontrib.mermaid',        # Render Mermaid diagrams
+    'sphinxcontrib.images'          # Allow zooming on images
 ]
+
+
 
 templates_path = ['_templates']
 exclude_patterns = []
@@ -41,6 +43,7 @@ source_suffix = {
     '.rst': 'restructuredtext',
     '.md': 'markdown',
 }
+
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output

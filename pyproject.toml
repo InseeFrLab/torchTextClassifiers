@@ -45,7 +45,7 @@ docs = [
   "ipython>=8.0.0",
   "pandoc>=2.0.0",
   "linkify-it-py>=2.0.0",
-  "sphinxcontrib-mermaid>=0.9.0",
+  "sphinxcontrib-images>=1.0.1"
 ]
 
 [project.optional-dependencies]

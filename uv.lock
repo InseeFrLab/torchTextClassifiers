@@ -2582,25 +2582,24 @@ wheels = [
 ]
 
 [[package]]
+name = "sphinxcontrib-images"
+version = "1.0.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "requests" },
+    { name = "sphinx" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/08/c5/402cce1cc18caff306effa09e77fdb3872289edc956a5c1bf53c03799b3b/sphinxcontrib_images-1.0.1-py3-none-any.whl", hash = "sha256:3cc9738dc15bacb3ab153b411a1b50dbfaa2535b49853ef3eae4d22adbbffa26", size = 119672, upload-time = "2025-06-07T22:42:48.954Z" },
+]
+
+[[package]]
 name = "sphinxcontrib-jsmath"
 version = "1.0.1"
 source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/b2/e8/9ed3830aeed71f17c026a07a5097edcf44b692850ef215b161b8ad875729/sphinxcontrib-jsmath-1.0.1.tar.gz", hash = "sha256:a9925e4a4587247ed2191a22df5f6970656cb8ca2bd6284309578f2153e0c4b8", size = 5787, upload-time = "2019-01-21T16:10:16.347Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c2/42/4c8646762ee83602e3fb3fbe774c2fac12f317deb0b5dbeeedd2d3ba4b77/sphinxcontrib_jsmath-1.0.1-py2.py3-none-any.whl", hash = "sha256:2ec2eaebfb78f3f2078e73666b1415417a116cc848b72e5172e596c871103178", size = 5071, upload-time = "2019-01-21T16:10:14.333Z" },
-]
-
-[[package]]
-name = "sphinxcontrib-mermaid"
-version = "1.2.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "pyyaml" },
-    { name = "sphinx" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/97/83/11fe1f2968c05fae725e473e8b3be08cbe5f51b83ddaf3309ab4c841082a/sphinxcontrib_mermaid-1.2.2.tar.gz", hash = "sha256:35423c13e565abb839b13f955f9722f0769e77e5d607ca07877ce93e1636c196", size = 18851, upload-time = "2025-11-24T01:05:48.702Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/77/74/f24437b92c3a34eadf93987d8472def6532200621df223e1b818c4318d63/sphinxcontrib_mermaid-1.2.2-py3-none-any.whl", hash = "sha256:51655f592300fc70e73b3ef2007cfc44fac11da5ff1f15c4725c83bf4a5b517c", size = 13416, upload-time = "2025-11-24T01:05:47.252Z" },
 ]
 
 [[package]]
@@ -2804,7 +2803,7 @@ docs = [
     { name = "sphinx-autodoc-typehints" },
     { name = "sphinx-copybutton" },
     { name = "sphinx-design" },
-    { name = "sphinxcontrib-mermaid" },
+    { name = "sphinxcontrib-images" },
 ]
 
 [package.metadata]
@@ -2846,7 +2845,7 @@ docs = [
     { name = "sphinx-autodoc-typehints", specifier = ">=2.0.0" },
     { name = "sphinx-copybutton", specifier = ">=0.5.0" },
     { name = "sphinx-design", specifier = ">=0.6.0" },
-    { name = "sphinxcontrib-mermaid", specifier = ">=0.9.0" },
+    { name = "sphinxcontrib-images", specifier = ">=1.0.1" },
 ]
 
 [[package]]
