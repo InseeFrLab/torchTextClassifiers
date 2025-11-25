@@ -147,7 +147,7 @@ Example:
        nn.Linear(64, 5)
    )
 
-   head = ClassificationHead(linear=custom_head_module)
+   head = ClassificationHead(net=custom_head_module)
 
 Attention Mechanism
 -------------------
@@ -270,3 +270,4 @@ See Also
 * :doc:`model` - How components are used in models
 * :doc:`../architecture/overview` - Architecture explanation
 * :doc:`configs` - ModelConfig for component configuration
+
