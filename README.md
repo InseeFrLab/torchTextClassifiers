@@ -34,8 +34,7 @@ pip install -e .
 
 ## 📖 Documentation
 
-Full documentation is available at: **https://inseeflab.github.io/torchTextClassifiers/**
-
+Full documentation is available at: **https://inseefrlab.github.io/torchTextClassifiers/**
 The documentation includes:
 - **Getting Started**: Installation and quick start guide
 - **Architecture**: Understanding the 3-layer design
@@ -58,3 +57,4 @@ See the [examples/](examples/) directory for:
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
