@@ -6,20 +6,8 @@ torchTextClassifiers is a **modular, component-based framework** for text classi
 
 At its core, torchTextClassifiers processes data through a simple pipeline:
 
-```{mermaid}
-flowchart LR
-    TextInput["Text Input"] --> Tokenizer
-    Tokenizer --> TextEmbedder["Text Embedder"]
-
-    CatInput["Categorical Features<br/>(Optional)"] --> CatEmbedder["Categorical Embedder"]
-
-    TextEmbedder --> ClassHead["Classification Head"]
-    CatEmbedder --> ClassHead
-
-    ClassHead --> Predictions
-
-    style CatInput stroke-dasharray: 5 5
-    style CatEmbedder stroke-dasharray: 5 5
+```{thumbnail} diagrams/ttc_architecture.png
+:alt: Package Architecture
 ```
 
 **Data Flow:**
@@ -195,7 +183,9 @@ The `forward_type` controls how categorical embeddings are combined:
 
 Average all categorical embeddings, then concatenate with text:
 
-![Average and Concatenate](diagrams/avg_concat.png)
+```{thumbnail} diagrams/avg_concat.png
+:alt: Average and Concatenate
+```
 
 ```python
 forward_type=CategoricalForwardType.AVERAGE_AND_CONCAT
@@ -209,7 +199,9 @@ forward_type=CategoricalForwardType.AVERAGE_AND_CONCAT
 
 Concatenate each categorical embedding separately:
 
-![Full Concatenation](diagrams/full_concat.png)
+```{thumbnail} diagrams/full_concat.png
+:alt: Full Concatenation
+```
 
 ```python
 forward_type=CategoricalForwardType.CONCATENATE_ALL
@@ -283,8 +275,9 @@ head = ClassificationHead(linear=custom_head)
 
 ## Complete Architecture
 
-![Complete Architecture](diagrams/NN.drawio.png)
-*Complete model architecture showing all components*
+```{thumbnail} diagrams/NN.drawio.png
+:alt: 
+```
 
 ### Full Model Assembly
 
