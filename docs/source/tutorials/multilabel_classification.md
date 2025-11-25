@@ -58,7 +58,7 @@ labels = [
 
 ## Two Approaches to Multilabel
 
-### Approach 1: Ragged Lists (Recommended)
+### Approach 1: Ragged Lists
 
 Each sample has a **list of label indices**:
 
@@ -72,14 +72,14 @@ labels = [
 
 **Pros:**
 - Natural representation
-- Saves memory
 - Easy to construct
 
 **Cons:**
 - Can't directly convert to numpy array
 - Variable-length lists
+- Forward pass a bit slower (we convert to one-hot encodings behind the scene, on the fly for each batch)
 
-### Approach 2: One-Hot Encoding
+### Approach 2: One-Hot Encoding (Recommended)
 
 Each sample has a **binary vector** (1 = label present, 0 = absent):
 
@@ -96,8 +96,7 @@ labels = [
 - Can store probabilities (not just 0/1)
 
 **Cons:**
-- Memory-intensive for many labels
-- Sparse representation
+- _Might_ require a bit more work on your end to have this format
 
 ## Complete Example: Ragged Lists
 
@@ -247,14 +246,12 @@ predictions = result["prediction"]
 ### 1. Choose Your Approach
 
 **Use Ragged Lists if:**
-- You have variable numbers of labels per sample
-- Memory is a concern
-- Data is naturally in list format
+- Data is naturally in list format...
+- ... and it wouldbe too costly to one-hot encode them
 
 **Use One-Hot if:**
-- You need fixed-size arrays
+- You want more efficiency
 - You want to store probabilities
-- You're integrating with systems expecting one-hot
 
 ### 2. Prepare Labels
 
@@ -263,9 +260,6 @@ predictions = result["prediction"]
 ```python
 # List of lists (variable length)
 labels = [[0, 1], [1, 2, 3], [0]]
-
-# Convert to numpy array with dtype=object
-y = np.array(labels, dtype=object)
 ```
 
 #### One-Hot Encoding
@@ -288,7 +282,7 @@ one_hot_labels = mlb.fit_transform(ragged_labels)
 
 ### 3. Configure Loss Function
 
-**Always use `BCEWithLogitsLoss` for multilabel:**
+**We recommend to use `BCEWithLogitsLoss` for multilabel:**
 
 ```python
 import torch
@@ -640,3 +634,4 @@ Ready to combine everything? Try adding categorical features to multilabel class
 - **Mixed features**: Combine multilabel with categorical features
 - **Explainability**: Understand which words trigger which labels
 - **API Reference**: See {doc}`../api/index` for detailed documentation
+
