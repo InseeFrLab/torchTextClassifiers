@@ -171,13 +171,17 @@ def run_full_pipeline(tokenizer, sample_text_data, categorical_data, labels, mod
     attributions = predictions["attributions"][text_idx]
     word_ids = predictions["word_ids"][text_idx]
 
-    word_attributions = map_attributions_to_word(attributions, word_ids)
+    words, word_attributions = map_attributions_to_word(attributions, text, word_ids, offsets)
     char_attributions = map_attributions_to_char(attributions, offsets, text)
 
     # Note: We're not actually plotting in tests, just calling the functions
     # to ensure they don't raise errors
     plot_attributions_at_char(text, char_attributions)
-    plot_attributions_at_word(text, word_attributions)
+    plot_attributions_at_word(
+        text=text,
+        words=words.values(),
+        attributions_per_word=word_attributions,
+    )
 
 
 def test_wordpiece_tokenizer(sample_data, model_params):
