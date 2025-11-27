@@ -178,3 +178,8 @@ poetry.lock
 .vscode/
 
 benchmark_results/
+
+example_files/
+_site/
+.quarto/
+**/*.quarto_ipynb
