@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - docs-website
+      - notebook_output
   pull_request:
     branches:
       - main
