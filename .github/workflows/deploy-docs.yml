@@ -1,23 +1,20 @@
-name: Deploy Documentation
+name: Deploy Documentation + Notebooks
 
 on:
   push:
     branches:
       - main
       - docs-website
-      - notebook_output
   pull_request:
     branches:
       - main
   workflow_dispatch:
 
-# Sets permissions for GitHub Pages deployment
 permissions:
   contents: read
   pages: write
   id-token: write
 
-# Allow one concurrent deployment
 concurrency:
   group: "pages"
   cancel-in-progress: true
@@ -28,15 +25,15 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@v4
 
     - name: Set up Python
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.14'
+        python-version: '3.12'
 
     - name: Install uv
-      uses: astral-sh/setup-uv@v7
+      uses: astral-sh/setup-uv@v3
 
     - name: Install dependencies
       run: |
@@ -47,14 +44,29 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y pandoc
 
-    - name: Build documentation
+    - name: Build Sphinx documentation
       run: |
         uv run sphinx-build -b html docs/source build/html
+
+    - name: Setup Quarto
+      uses: quarto-dev/quarto-actions/setup@v2
+
+    - name: Render Quarto notebooks
+      run: |
+        cd notebooks
+        quarto render
+
+    - name: Combine Sphinx + Notebooks
+      run: |
+        mkdir -p final_site
+        cp -r build/html/* final_site/
+        mkdir -p final_site/notebooks
+        cp -r notebooks/_site/* final_site/notebooks/
 
     - name: Upload artifact
       uses: actions/upload-pages-artifact@v4
       with:
-        path: build/html
+        path: final_site
 
   deploy:
     needs: build
