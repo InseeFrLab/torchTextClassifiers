@@ -53,8 +53,18 @@ def map_attributions_to_char(attributions, offsets, text):
         np.exp(attributions_per_char), axis=1, keepdims=True
     )  # softmax normalization
 
+def get_id_to_word(text, word_ids, offsets):
+    words = {}
+    for idx, word_id in enumerate(word_ids):
+        if word_id is None:
+            continue
+        start, end = offsets[idx]
+        words[int(word_id)] = text[start:end]
+    
+    return words
 
-def map_attributions_to_word(attributions, word_ids):
+
+def map_attributions_to_word(attributions, text, word_ids, offsets):
     """
     Maps token-level attributions to word-level attributions based on word IDs.
     Args:
@@ -69,8 +79,9 @@ def map_attributions_to_word(attributions, word_ids):
         np.ndarray: Array of shape (top_k, num_words) containing word-level attributions.
             num_words is the number of unique words in the original text.
     """
-
+    
     word_ids = np.array(word_ids)
+    words = get_id_to_word(text, word_ids, offsets)
 
     # Convert None to -1 for easier processing (PAD tokens)
     word_ids_int = np.array([x if x is not None else -1 for x in word_ids], dtype=int)
@@ -99,7 +110,7 @@ def map_attributions_to_word(attributions, word_ids):
         )  # zero-out non-matching tokens and sum attributions for all tokens belonging to the same word
 
     # assert word_attributions.sum(axis=1) == attributions.sum(axis=1), "Sum of word attributions per top_k must equal sum of token attributions per top_k."
-    return np.exp(word_attributions) / np.sum(
+    return words, np.exp(word_attributions) / np.sum(
         np.exp(word_attributions), axis=1, keepdims=True
     )  # softmax normalization
 
@@ -131,7 +142,7 @@ def plot_attributions_at_char(
         fig, ax = plt.subplots(figsize=figsize)
         ax.bar(range(len(text)), attributions_per_char[i])
         ax.set_xticks(np.arange(len(text)))
-        ax.set_xticklabels(list(text), rotation=90)
+        ax.set_xticklabels(list(text), rotation=45)
         title = titles[i] if titles is not None else f"Attributions for Top {i+1} Prediction"
         ax.set_title(title)
         ax.set_xlabel("Characters in Text")
@@ -142,7 +153,7 @@ def plot_attributions_at_char(
 
 
 def plot_attributions_at_word(
-    text, attributions_per_word, figsize=(10, 2), titles: Optional[List[str]] = None
+    text, words, attributions_per_word, figsize=(10, 2), titles: Optional[List[str]] = None
 ):
     """
     Plots word-level attributions as a heatmap.
@@ -159,14 +170,13 @@ def plot_attributions_at_word(
             "matplotlib is required for plotting. Please install it to use this function."
         )
 
-    words = text.split()
     top_k = attributions_per_word.shape[0]
     all_plots = []
     for i in range(top_k):
         fig, ax = plt.subplots(figsize=figsize)
         ax.bar(range(len(words)), attributions_per_word[i])
         ax.set_xticks(np.arange(len(words)))
-        ax.set_xticklabels(words, rotation=90)
+        ax.set_xticklabels(words, rotation=45)
         title = titles[i] if titles is not None else f"Attributions for Top {i+1} Prediction"
         ax.set_title(title)
         ax.set_xlabel("Words in Text")
