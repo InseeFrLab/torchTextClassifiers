@@ -40,7 +40,7 @@ jobs:
          with:
           enable-cache: true
           cache-dependency-glob: "uv.lock"
-          version: 0.9.16
+          version: 0.9.17
        
        - name: Change Package Version
          run: |
