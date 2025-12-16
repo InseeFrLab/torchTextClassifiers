@@ -130,8 +130,9 @@ def main():
     )
 
     classifier.train(
-        X_train, y_train, X_val, y_val,
+        X_train, y_train, 
         training_config=training_config,
+        X_val=X_val, y_val=y_val,
         verbose=True
     )
 
@@ -172,13 +173,13 @@ def main():
         lr=1e-3,
         patience_early_stopping=7,
         num_workers=0,
-        cpu_run=False,  # Don't override accelerator from trainer_params
         trainer_params=advanced_trainer_params
     )
 
     advanced_classifier.train(
-        X_train, y_train, X_val, y_val,
+        X_train, y_train,
         training_config=advanced_training_config,
+        X_val=X_val, y_val=y_val,
         verbose=True
     )
 
@@ -206,14 +207,14 @@ def main():
         batch_size=16,  # Larger batch size for CPU
         lr=1e-3,
         patience_early_stopping=3,
-        cpu_run=False,  # Don't override accelerator from trainer_params
         num_workers=0,  # No multiprocessing for CPU
         trainer_params={'deterministic': True, 'accelerator': 'cpu'}
     )
 
     cpu_classifier.train(
-        X_train, y_train, X_val, y_val,
+        X_train, y_train,
         training_config=cpu_training_config,
+        X_val=X_val, y_val=y_val,
         verbose=True
     )
 
@@ -257,8 +258,9 @@ def main():
     )
 
     custom_classifier.train(
-        X_train, y_train, X_val, y_val,
+        X_train, y_train,
         training_config=custom_training_config,
+        X_val=X_val, y_val=y_val,
         verbose=True
     )
 

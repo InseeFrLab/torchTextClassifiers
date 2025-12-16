@@ -170,8 +170,9 @@ def train_and_evaluate_model(X, y, model_name, use_categorical=False, use_simple
     # Train model
     print("   🎯 Training model...")
     classifier.train(
-        X_train, y_train, X_val, y_val,
+        X_train, y_train,
         training_config=training_config,
+        X_val=X_val, y_val=y_val,
         verbose=True
     )
     training_time = time.time() - start_time
