@@ -15,7 +15,7 @@ A simple binary sentiment classification example that covers:
 **Run the example:**
 ```bash
 cd examples
-uv run python basic_classification.py
+uv run --extra huggingface python basic_classification.py
 ```
 
 **What you'll learn:**
@@ -34,7 +34,7 @@ Demonstrates 3-class sentiment analysis (positive, negative, neutral):
 **Run the example:**
 ```bash
 cd examples
-uv run python multiclass_classification.py
+uv run  --extra huggingface python multiclass_classification.py
 ```
 
 **What you'll learn:**
@@ -53,7 +53,7 @@ Shows how to combine text and categorical features:
 **Run the example:**
 ```bash
 cd examples
-uv run python Using_additional_features.py
+uv run  --extra huggingface python Using_additional_features.py
 ```
 
 **What you'll learn:**
@@ -72,7 +72,7 @@ Explores advanced training configurations:
 **Run the example:**
 ```bash
 cd examples
-uv run python advanced_training.py
+uv run --extra huggingface python advanced_training.py
 ```
 
 **What you'll learn:**
@@ -93,10 +93,10 @@ Demonstrates model explainability with ASCII histogram visualizations:
 ```bash
 cd examples
 # Regular mode - analyze predefined examples
-uv run python simple_explainability_example.py
+uv run --extra huggingface python simple_explainability_example.py
 
 # Interactive mode - analyze your own text
-uv run python simple_explainability_example.py --interactive
+uv run --extra huggingface python simple_explainability_example.py --interactive
 ```
 
 **What you'll learn:**
@@ -111,19 +111,19 @@ uv run python simple_explainability_example.py --interactive
 To run any example:
 
 1. **Install dependencies:**
-   ```bash
-   uv sync
-   ```
+```bash
+uv sync
+```
 
 2. **Navigate to examples directory:**
-   ```bash
-   cd examples
-   ```
+```bash
+cd examples
+```
 
 3. **Run an example:**
-   ```bash
-   uv run python basic_classification.py
-   ```
+```bash
+uv --extra huggingface run python basic_classification.py
+```
 
 ## 📊 Example Outputs
 

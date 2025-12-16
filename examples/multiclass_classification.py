@@ -128,8 +128,9 @@ def main():
         trainer_params={'deterministic': True}
     )
     classifier.train(
-        X_train, y_train, X_val, y_val,
+        X_train, y_train,
         training_config=training_config,
+        X_val=X_val, y_val=y_val,
         verbose=True
     )
     print("✅ Training completed!")
