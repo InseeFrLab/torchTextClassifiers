@@ -198,6 +198,12 @@ class torchTextClassifiers:
         - Model training with early stopping
         - Best model loading after training
 
+        Note on Checkpoints:
+            After training, the best model checkpoint is automatically loaded.
+            This checkpoint contains the full training state (model weights,
+            optimizer, and scheduler state). Loading uses weights_only=False
+            as the checkpoint is self-generated and trusted.
+
         Args:
             X_train: Training input data
             y_train: Training labels
@@ -361,6 +367,7 @@ class torchTextClassifiers:
             best_model_path,
             model=self.pytorch_model,
             loss=training_config.loss,
+            weights_only=False,  # Required: checkpoint contains optimizer/scheduler state
         )
 
         self.pytorch_model = self.lightning_module.model.to(self.device)
