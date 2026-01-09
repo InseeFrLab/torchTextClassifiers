@@ -123,8 +123,8 @@ training_config = TrainingConfig(
 
 classifier.train(
     X_train, y_train,
+    training_config,
     X_val, y_val,
-    training_config=training_config,
     verbose=True
 )
 
@@ -228,8 +228,8 @@ Training is identical to binary classification:
 ```python
 classifier.train(
     X_train, y_train,
+    training_config
     X_val, y_val,
-    training_config=training_config
 )
 ```
 
@@ -457,3 +457,4 @@ In this tutorial, you learned:
 - ✅ How to handle class imbalance
 
 You're now ready to tackle real-world multiclass problems!
+
