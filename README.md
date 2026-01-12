@@ -23,7 +23,7 @@ A unified, extensible framework for text classification with categorical variabl
 ```bash
 # Clone the repository
 git clone https://github.com/InseeFrLab/torchTextClassifiers.git
-cd torchtextClassifiers
+cd torchTextClassifiers
 
 # Install with uv (recommended)
 uv sync
