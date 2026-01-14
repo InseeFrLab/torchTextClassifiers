@@ -36,7 +36,7 @@ class TextClassificationModule(pl.LightningModule):
             scheduler_interval: Scheduler interval.
         """
         super().__init__()
-        self.save_hyperparameters(ignore=["model", "loss"])
+        self.save_hyperparameters(ignore=["model"])
 
         self.model = model
         self.loss = loss

@@ -159,6 +159,7 @@ def run_full_pipeline(tokenizer, sample_text_data, categorical_data, labels, mod
         y_val=Y,
         training_config=training_config,
     )
+    ttc.load(ttc.save_path)  # test load
 
     # Predict with explanations
     top_k = 5

@@ -23,6 +23,9 @@ class TextEmbedder(nn.Module):
         self.config = text_embedder_config
 
         self.attention_config = text_embedder_config.attention_config
+        if isinstance(self.attention_config, dict):
+            self.attention_config = AttentionConfig(**self.attention_config)
+
         if self.attention_config is not None:
             self.attention_config.n_embd = text_embedder_config.embedding_dim
 

@@ -1,6 +1,8 @@
 import logging
+import pickle
 import time
 from dataclasses import asdict, dataclass, field
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 try:
@@ -75,6 +77,7 @@ class TrainingConfig:
     trainer_params: Optional[dict] = None
     optimizer_params: Optional[dict] = None
     scheduler_params: Optional[dict] = None
+    save_path: Optional[str] = "my_ttc"
 
     def to_dict(self) -> Dict[str, Any]:
         data = asdict(self)
@@ -362,6 +365,7 @@ class torchTextClassifiers:
             logger.info(f"Training completed in {end - start:.2f} seconds.")
 
         best_model_path = trainer.checkpoint_callback.best_model_path
+        self.checkpoint_path = best_model_path
 
         self.lightning_module = TextClassificationModule.load_from_checkpoint(
             best_model_path,
@@ -371,6 +375,9 @@ class torchTextClassifiers:
         )
 
         self.pytorch_model = self.lightning_module.model.to(self.device)
+
+        self.save_path = training_config.save_path
+        self.save(self.save_path)
 
         self.lightning_module.eval()
 
@@ -575,6 +582,122 @@ class torchTextClassifiers:
                 "prediction": predictions,
                 "confidence": confidence,
             }
+
+    def save(self, path: Union[str, Path]) -> None:
+        """Save the complete torchTextClassifiers instance to disk.
+
+        This saves:
+        - Model configuration
+        - Tokenizer state
+        - PyTorch Lightning checkpoint (if trained)
+        - All other instance attributes
+
+        Args:
+            path: Directory path where the model will be saved
+
+        Example:
+            >>> ttc = torchTextClassifiers(tokenizer, model_config)
+            >>> ttc.train(X_train, y_train, training_config)
+            >>> ttc.save("my_model")
+        """
+        path = Path(path)
+        path.mkdir(parents=True, exist_ok=True)
+
+        # Save the checkpoint if model has been trained
+        checkpoint_path = None
+        if hasattr(self, "lightning_module"):
+            checkpoint_path = path / "model_checkpoint.ckpt"
+            # Save the current state as a checkpoint
+            trainer = pl.Trainer()
+            trainer.strategy.connect(self.lightning_module)
+            trainer.save_checkpoint(checkpoint_path)
+
+        # Prepare metadata to save
+        metadata = {
+            "model_config": self.model_config.to_dict(),
+            "ragged_multilabel": self.ragged_multilabel,
+            "vocab_size": self.vocab_size,
+            "embedding_dim": self.embedding_dim,
+            "categorical_vocabulary_sizes": self.categorical_vocabulary_sizes,
+            "num_classes": self.num_classes,
+            "checkpoint_path": str(checkpoint_path) if checkpoint_path else None,
+            "device": str(self.device) if hasattr(self, "device") else None,
+        }
+
+        # Save metadata
+        with open(path / "metadata.pkl", "wb") as f:
+            pickle.dump(metadata, f)
+
+        # Save tokenizer
+        tokenizer_path = path / "tokenizer.pkl"
+        with open(tokenizer_path, "wb") as f:
+            pickle.dump(self.tokenizer, f)
+
+        logger.info(f"Model saved successfully to {path}")
+
+    @classmethod
+    def load(cls, path: Union[str, Path], device: str = "auto") -> "torchTextClassifiers":
+        """Load a torchTextClassifiers instance from disk.
+
+        Args:
+            path: Directory path where the model was saved
+            device: Device to load the model on ('auto', 'cpu', 'cuda', etc.)
+
+        Returns:
+            Loaded torchTextClassifiers instance
+
+        Example:
+            >>> loaded_ttc = torchTextClassifiers.load("my_model")
+            >>> predictions = loaded_ttc.predict(X_test)
+        """
+        path = Path(path)
+
+        if not path.exists():
+            raise FileNotFoundError(f"Model directory not found: {path}")
+
+        # Load metadata
+        with open(path / "metadata.pkl", "rb") as f:
+            metadata = pickle.load(f)
+
+        # Load tokenizer
+        with open(path / "tokenizer.pkl", "rb") as f:
+            tokenizer = pickle.load(f)
+
+        # Reconstruct model_config
+        model_config = ModelConfig.from_dict(metadata["model_config"])
+
+        # Create instance
+        instance = cls(
+            tokenizer=tokenizer,
+            model_config=model_config,
+            ragged_multilabel=metadata["ragged_multilabel"],
+        )
+
+        # Set device
+        if device == "auto":
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        else:
+            device = torch.device(device)
+        instance.device = device
+
+        # Load checkpoint if it exists
+        if metadata["checkpoint_path"]:
+            checkpoint_path = path / "model_checkpoint.ckpt"
+            if checkpoint_path.exists():
+                # Load the checkpoint with weights_only=False since it's our own trusted checkpoint
+                instance.lightning_module = TextClassificationModule.load_from_checkpoint(
+                    str(checkpoint_path),
+                    model=instance.pytorch_model,
+                    weights_only=False,
+                )
+                instance.pytorch_model = instance.lightning_module.model.to(device)
+                instance.checkpoint_path = str(checkpoint_path)
+                logger.info(f"Model checkpoint loaded from {checkpoint_path}")
+            else:
+                logger.warning(f"Checkpoint file not found at {checkpoint_path}")
+
+        logger.info(f"Model loaded successfully from {path}")
+        return instance
 
     def __repr__(self):
         model_type = (
