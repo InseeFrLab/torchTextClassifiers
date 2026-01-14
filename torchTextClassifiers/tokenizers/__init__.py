@@ -7,4 +7,6 @@ from .base import (
 )
 from .base import TokenizerOutput as TokenizerOutput
 from .ngram import NGramTokenizer as NGramTokenizer
-from .WordPiece import WordPieceTokenizer as WordPieceTokenizer
+
+if HAS_HF:
+    from .WordPiece import WordPieceTokenizer as WordPieceTokenizer
