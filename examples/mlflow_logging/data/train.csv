@@ -1,0 +1,31 @@
+text,category,label
+"This phone has amazing battery life and great camera!",0,1
+"Best laptop I've ever owned, super fast and reliable.",0,1
+"The sound quality of these headphones is incredible!",0,1
+"Love this tablet, perfect for reading and gaming.",0,1
+"Great smart watch with accurate fitness tracking.",0,1
+"Phone screen cracked after one week, terrible quality.",0,0
+"Laptop overheats constantly and crashes often.",0,0
+"Headphones broke after a month, waste of money.",0,0
+"Tablet is slow and battery drains too fast.",0,0
+"Watch stopped working after firmware update.",0,0
+"Perfect fit and comfortable material, love it!",1,1
+"Beautiful dress, exactly as pictured, great quality.",1,1
+"These jeans are so comfortable and durable.",1,1
+"Best jacket I own, keeps me warm in winter.",1,1
+"Shoes are stylish and very comfortable for walking.",1,1
+"Shirt shrunk after first wash, poor quality fabric.",1,0
+"Color faded quickly, not worth the price.",1,0
+"Doesn't fit as described, returning immediately.",1,0
+"Material feels cheap and uncomfortable.",1,0
+"Stitching came undone after wearing twice.",1,0
+"Couldn't put this book down, absolutely captivating!",2,1
+"Well written and thought-provoking, highly recommend.",2,1
+"Amazing story with unforgettable characters.",2,1
+"This book changed my perspective on life.",2,1
+"Beautifully written, a masterpiece of literature.",2,1
+"Boring plot, couldn't finish reading it.",2,0
+"Poorly written with many grammatical errors.",2,0
+"Disappointing ending ruined the whole book.",2,0
+"Characters are flat and uninteresting.",2,0
+"Overrated, don't understand the hype.",2,0

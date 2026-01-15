@@ -20,6 +20,26 @@ A unified, extensible framework for text classification with categorical variabl
 
 ## 📦 Installation
 
+### From Pypi (recommended)
+
+```bash
+# With uv
+
+uv add torchTextClassifiers
+
+# For using huggingface tokenizers
+uv add torchTextClassifiers --extra huggingface 
+
+# With pip
+
+pip install torchTextclassifiers
+
+# For using huggingface tokenizers
+pip install torchTextclassifiers[huggingface] 
+```
+
+
+### From Source
 ```bash
 # Clone the repository
 git clone https://github.com/InseeFrLab/torchTextClassifiers.git

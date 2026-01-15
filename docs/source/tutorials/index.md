@@ -10,6 +10,7 @@ multiclass_classification
 mixed_features
 explainability
 multilabel_classification
+mlflow_integration
 ```
 
 ## Overview
@@ -116,6 +117,22 @@ Assign multiple labels to each text sample for complex classification scenarios.
 **Difficulty:** Advanced | **Time:** 30 minutes
 :::
 
+:::{grid-item-card} {fas}`chart-line` MLflow Integration
+:link: mlflow_integration
+:link-type: doc
+
+Track experiments and deploy models with MLflow for production-ready ML pipelines.
+
+**What you'll learn:**
+- Log training metrics per epoch
+- Create portable pyfunc models
+- Export models without package dependency
+- Flexible inference input formats
+- Use MLflow UI for visualization
+
+**Difficulty:** Advanced | **Time:** 25 minutes
+:::
+
 ::::
 
 ## Learning Path
@@ -129,6 +146,7 @@ graph LR
     C --> D[Mixed Features]
     C --> F[Multilabel Classification]
     D --> E[Explainability]
+    D --> G[MLflow Integration]
     F --> E
 
     style A fill:#e3f2fd
@@ -137,6 +155,7 @@ graph LR
     style D fill:#64b5f6
     style E fill:#1976d2
     style F fill:#42a5f5
+    style G fill:#4caf50
 ```
 
 1. **Start with**: {doc}`../getting_started/quickstart` - Get familiar with the basics
@@ -144,6 +163,7 @@ graph LR
 3. **Next**: {doc}`multiclass_classification` - Handle multiple classes
 4. **Branch out**: {doc}`mixed_features` for categorical features OR {doc}`multilabel_classification` for multiple labels
 5. **Master**: {doc}`explainability` - Understand your model's predictions
+6. **Deploy**: {doc}`mlflow_integration` - Track experiments and deploy to production
 
 ## Tutorial Format
 
@@ -238,6 +258,7 @@ All tutorials are based on runnable examples in the repository:
 - [examples/using_additional_features.py](https://github.com/InseeFrLab/torchTextClassifiers/blob/main/examples/using_additional_features.py)
 - [examples/advanced_training.py](https://github.com/InseeFrLab/torchTextClassifiers/blob/main/examples/advanced_training.py)
 - [examples/simple_explainability_example.py](https://github.com/InseeFrLab/torchTextClassifiers/blob/main/examples/simple_explainability_example.py)
+- [examples/mlflow_logging_example.py](https://github.com/InseeFrLab/torchTextClassifiers/blob/main/examples/mlflow_logging_example.py)
 
 ### Jupyter Notebooks
 
