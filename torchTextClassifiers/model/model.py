@@ -118,6 +118,7 @@ class TextClassificationModel(nn.Module):
         input_ids: Annotated[torch.Tensor, "batch seq_len"],
         attention_mask: Annotated[torch.Tensor, "batch seq_len"],
         categorical_vars: Annotated[torch.Tensor, "batch num_cats"],
+        return_label_attention_matrix: bool = False,
         **kwargs,
     ) -> torch.Tensor:
         """
@@ -136,7 +137,16 @@ class TextClassificationModel(nn.Module):
         if self.text_embedder is None:
             x_text = encoded_text.float()
         else:
-            x_text = self.text_embedder(input_ids=encoded_text, attention_mask=attention_mask)
+            text_embed_output = self.text_embedder(
+                input_ids=encoded_text,
+                attention_mask=attention_mask,
+                return_label_attention_matrix=return_label_attention_matrix,
+            )
+            x_text = text_embed_output["sentence_embedding"]
+            if isinstance(return_label_attention_matrix, torch.Tensor):
+                return_label_attention_matrix = return_label_attention_matrix[0].item()
+            if return_label_attention_matrix:
+                label_attention_matrix = text_embed_output["label_attention_matrix"]
 
         if self.categorical_variable_net:
             x_cat = self.categorical_variable_net(categorical_vars)
@@ -165,5 +175,8 @@ class TextClassificationModel(nn.Module):
             x_combined = x_text
 
         logits = self.classification_head(norm(x_combined)).squeeze(-1)
+
+        if return_label_attention_matrix:
+            return {"logits": logits, "label_attention_matrix": label_attention_matrix}
 
         return logits

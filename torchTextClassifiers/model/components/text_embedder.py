@@ -170,13 +170,10 @@ class TextEmbedder(nn.Module):
             return_label_attention_matrix=return_label_attention_matrix,
         ).values()
 
-        if return_label_attention_matrix:
-            return (
-                text_embedding,
-                label_attention_matrix,
-            )  # label_attention_matrix is None if label attention is disabled
-        else:
-            return text_embedding
+        return {
+            "sentence_embedding": text_embedding,
+            "label_attention_matrix": label_attention_matrix,
+        }
 
     def _get_sentence_embedding(
         self,
@@ -304,6 +301,9 @@ class LabelAttentionClassifier(nn.Module):
 
         """
         B, T, C = token_embeddings.size()
+        if isinstance(compute_attention_matrix, torch.Tensor):
+            compute_attention_matrix = compute_attention_matrix[0].item()
+        compute_attention_matrix = bool(compute_attention_matrix)
 
         # 1. Create label indices [0, 1, ..., C-1] for the whole batch
         label_indices = torch.arange(self.num_classes).expand(B, -1)
