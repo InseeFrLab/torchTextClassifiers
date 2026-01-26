@@ -324,7 +324,9 @@ class LabelAttentionClassifier(nn.Module):
         compute_attention_matrix = bool(compute_attention_matrix)
 
         # 1. Create label indices [0, 1, ..., C-1] for the whole batch
-        label_indices = torch.arange(self.num_classes).expand(B, -1)
+        label_indices = torch.arange(
+            self.num_classes, dtype=torch.long, device=token_embeddings.device
+        ).expand(B, -1)
 
         all_label_embeddings = self.label_embeds(
             label_indices
