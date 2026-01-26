@@ -9,6 +9,7 @@ from torchTextClassifiers.model.components import (
     AttentionConfig,
     CategoricalVariableNet,
     ClassificationHead,
+    LabelAttentionConfig,
     TextEmbedder,
     TextEmbedderConfig,
 )
@@ -51,7 +52,14 @@ def model_params():
     }
 
 
-def run_full_pipeline(tokenizer, sample_text_data, categorical_data, labels, model_params):
+def run_full_pipeline(
+    tokenizer,
+    sample_text_data,
+    categorical_data,
+    labels,
+    model_params,
+    label_attention_enabled: bool = False,
+):
     """Helper function to run the complete pipeline for a given tokenizer."""
     # Create dataset
     dataset = TextClassificationDataset(
@@ -83,6 +91,15 @@ def run_full_pipeline(tokenizer, sample_text_data, categorical_data, labels, mod
         embedding_dim=model_params["embedding_dim"],
         padding_idx=padding_idx,
         attention_config=attention_config,
+        label_attention_config=(
+            LabelAttentionConfig(
+                n_head=attention_config.n_head,
+                n_kv_head=attention_config.n_kv_head,
+                num_classes=model_params["num_classes"],
+            )
+            if label_attention_enabled
+            else None
+        ),
     )
 
     text_embedder = TextEmbedder(text_embedder_config=text_embedder_config)
@@ -98,7 +115,7 @@ def run_full_pipeline(tokenizer, sample_text_data, categorical_data, labels, mod
     expected_input_dim = model_params["embedding_dim"] + categorical_var_net.output_dim
     classification_head = ClassificationHead(
         input_dim=expected_input_dim,
-        num_classes=model_params["num_classes"],
+        num_classes=model_params["num_classes"] if not label_attention_enabled else 1,
     )
 
     # Create model
@@ -136,6 +153,15 @@ def run_full_pipeline(tokenizer, sample_text_data, categorical_data, labels, mod
         categorical_embedding_dims=model_params["categorical_embedding_dims"],
         num_classes=model_params["num_classes"],
         attention_config=attention_config,
+        label_attention_config=(
+            LabelAttentionConfig(
+                n_head=attention_config.n_head,
+                n_kv_head=attention_config.n_kv_head,
+                num_classes=model_params["num_classes"],
+            )
+            if label_attention_enabled
+            else None
+        ),
     )
 
     # Create training config
@@ -239,3 +265,26 @@ def test_ngram_tokenizer(sample_data, model_params):
 
     # Run full pipeline
     run_full_pipeline(tokenizer, sample_text_data, categorical_data, labels, model_params)
+
+
+def test_label_attention_enabled(sample_data, model_params):
+    """Test the full pipeline with label attention enabled (using WordPieceTokenizer)."""
+    sample_text_data, categorical_data, labels = sample_data
+
+    vocab_size = 100
+    tokenizer = WordPieceTokenizer(vocab_size, output_dim=50)
+    tokenizer.train(sample_text_data)
+
+    # Check tokenizer works
+    result = tokenizer.tokenize(sample_text_data)
+    assert result.input_ids.shape[0] == len(sample_text_data)
+
+    # Run full pipeline with label attention enabled
+    run_full_pipeline(
+        tokenizer,
+        sample_text_data,
+        categorical_data,
+        labels,
+        model_params,
+        label_attention_enabled=True,
+    )
