@@ -121,17 +121,25 @@ class TextEmbedder(nn.Module):
         input_ids: torch.Tensor,
         attention_mask: torch.Tensor,
         return_label_attention_matrix: bool = False,
-    ) -> torch.Tensor:
+    ) -> dict[str, Optional[torch.Tensor]]:
         """Converts input token IDs to their corresponding embeddings.
 
         Args:
             input_ids (torch.Tensor[Long]), shape (batch_size, seq_len): Tokenized
             attention_mask (torch.Tensor[Long]), shape (batch_size, seq_len): Attention mask indicating non-pad tokens
-            return_label_attention_matrix (bool): Whether to return the label attention matrix
+            return_label_attention_matrix (bool): Whether to return the label attention matrix.
+
         Returns:
-            torch.Tensor: Text embeddings, shape (batch_size, embedding_dim) if self.enable_label_attention is False, else (batch_size, num_labels, embedding_dim)
-            torch.Tensor: Label attention matrix, shape (batch_size, num_labels, seq_len) if return_label_attention_matrix is True, else None.
-                          Also None if label attention is disabled (even if return_label_attention_matrix is True)
+            dict: A dictionary with the following keys:
+
+                - "sentence_embedding" (torch.Tensor): Text embeddings of shape
+                  (batch_size, embedding_dim) if ``self.enable_label_attention`` is False,
+                  else (batch_size, num_labels, embedding_dim).
+
+                - "label_attention_matrix" (Optional[torch.Tensor]): Label attention
+                  matrix of shape (batch_size, num_labels, seq_len) if
+                  ``return_label_attention_matrix`` is True and label attention is
+                  enabled, otherwise ``None``.
         """
 
         encoded_text = input_ids  # clearer name
