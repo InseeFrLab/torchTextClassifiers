@@ -180,12 +180,14 @@ class TextEmbedder(nn.Module):
 
             token_embeddings = norm(token_embeddings)
 
-        text_embedding, label_attention_matrix = self._get_sentence_embedding(
+        out = self._get_sentence_embedding(
             token_embeddings=token_embeddings,
             attention_mask=attention_mask,
             return_label_attention_matrix=return_label_attention_matrix,
-        ).values()
+        )
 
+        text_embedding = out["sentence_embedding"]
+        label_attention_matrix = out["label_attention_matrix"]
         return {
             "sentence_embedding": text_embedding,
             "label_attention_matrix": label_attention_matrix,
