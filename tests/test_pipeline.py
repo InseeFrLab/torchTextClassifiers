@@ -189,13 +189,19 @@ def run_full_pipeline(
 
     # Predict with explanations
     top_k = 5
-    predictions = ttc.predict(X, top_k=top_k, explain=True)
+
+    predictions = ttc.predict(
+        X,
+        top_k=top_k,
+        explain_with_label_attention=label_attention_enabled,
+        explain_with_captum=True,
+    )
 
     # Test explainability functions
     text_idx = 0
     text = sample_text_data[text_idx]
     offsets = predictions["offset_mapping"][text_idx]
-    attributions = predictions["attributions"][text_idx]
+    attributions = predictions["captum_attributions"][text_idx]
     word_ids = predictions["word_ids"][text_idx]
 
     words, word_attributions = map_attributions_to_word(attributions, text, word_ids, offsets)
