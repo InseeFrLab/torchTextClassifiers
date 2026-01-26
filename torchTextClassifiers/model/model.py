@@ -1,7 +1,7 @@
 """TextClassification model components.
 
 This module contains the PyTorch model, Lightning module, and dataset classes
-for TextClassification classification. Consolidates what was previously in pytorch_model.py,
+for text classification. Consolidates what was previously in pytorch_model.py,
 lightning_module.py, and dataset.py.
 """
 
