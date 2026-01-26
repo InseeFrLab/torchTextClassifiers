@@ -287,6 +287,20 @@ class LabelAttentionClassifier(nn.Module):
         self.enable_gqa = (
             self.n_head != self.n_kv_head
         )  # Group Query Attention (GQA): duplicate key/value heads to match query heads if desired
+        
+        # Validate head configuration
+        if self.embedding_dim % self.n_head != 0:
+            raise ValueError(
+                f"embedding_dim ({self.embedding_dim}) must be divisible by n_head ({self.n_head}). "
+                f"Got head_dim = {self.embedding_dim / self.n_head}"
+            )
+        
+        if self.n_head % self.n_kv_head != 0:
+            raise ValueError(
+                f"n_head ({self.n_head}) must be divisible by n_kv_head ({self.n_kv_head}) for Group Query Attention. "
+                f"Got n_head / n_kv_head = {self.n_head / self.n_kv_head}"
+            )
+        
         self.head_dim = self.embedding_dim // self.n_head
 
         self.label_embeds = nn.Embedding(self.num_classes, self.embedding_dim)
