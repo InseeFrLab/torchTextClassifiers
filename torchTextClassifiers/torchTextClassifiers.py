@@ -29,6 +29,7 @@ from torchTextClassifiers.model.components import (
     CategoricalForwardType,
     CategoricalVariableNet,
     ClassificationHead,
+    LabelAttentionConfig,
     TextEmbedder,
     TextEmbedderConfig,
 )
@@ -53,6 +54,7 @@ class ModelConfig:
     categorical_embedding_dims: Optional[Union[List[int], int]] = None
     num_classes: Optional[int] = None
     attention_config: Optional[AttentionConfig] = None
+    label_attention_config: Optional[LabelAttentionConfig] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -140,6 +142,7 @@ class torchTextClassifiers:
         self.embedding_dim = model_config.embedding_dim
         self.categorical_vocabulary_sizes = model_config.categorical_vocabulary_sizes
         self.num_classes = model_config.num_classes
+        self.enable_label_attention = model_config.label_attention_config is not None
 
         if self.tokenizer.output_vectorized:
             self.text_embedder = None
@@ -153,6 +156,7 @@ class torchTextClassifiers:
                 embedding_dim=self.embedding_dim,
                 padding_idx=tokenizer.padding_idx,
                 attention_config=model_config.attention_config,
+                label_attention_config=model_config.label_attention_config,
             )
             self.text_embedder = TextEmbedder(
                 text_embedder_config=text_embedder_config,
@@ -174,7 +178,9 @@ class torchTextClassifiers:
 
         self.classification_head = ClassificationHead(
             input_dim=classif_head_input_dim,
-            num_classes=model_config.num_classes,
+            num_classes=1
+            if self.enable_label_attention
+            else model_config.num_classes,  # output dim is 1 when using label attention, because embeddings are (num_classes, embedding_dim)
         )
 
         self.pytorch_model = TextClassificationModel(
