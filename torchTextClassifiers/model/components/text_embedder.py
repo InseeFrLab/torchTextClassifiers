@@ -35,7 +35,15 @@ class TextEmbedder(nn.Module):
         if isinstance(self.attention_config, dict):
             self.attention_config = AttentionConfig(**self.attention_config)
 
-        self.enable_label_attention = text_embedder_config.label_attention_config is not None
+        # Normalize label_attention_config: allow dicts and convert them to LabelAttentionConfig
+        self.label_attention_config = text_embedder_config.label_attention_config
+        if isinstance(self.label_attention_config, dict):
+            self.label_attention_config = LabelAttentionConfig(**self.label_attention_config)
+            # Keep self.config in sync so downstream components (e.g., LabelAttentionClassifier)
+            # always see a LabelAttentionConfig instance rather than a raw dict.
+            self.config.label_attention_config = self.label_attention_config
+
+        self.enable_label_attention = self.label_attention_config is not None
         if self.enable_label_attention:
             self.label_attention_module = LabelAttentionClassifier(self.config)
 
