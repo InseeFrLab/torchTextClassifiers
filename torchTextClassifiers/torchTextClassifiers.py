@@ -671,6 +671,10 @@ class torchTextClassifiers:
 
         # Reconstruct model_config
         model_config = ModelConfig.from_dict(metadata["model_config"])
+        if type(model_config.label_attention_config) is dict:
+            model_config.label_attention_config = LabelAttentionConfig(
+                **model_config.label_attention_config
+            )
 
         # Create instance
         instance = cls(
