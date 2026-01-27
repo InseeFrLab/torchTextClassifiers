@@ -6,7 +6,7 @@ lightning_module.py, and dataset.py.
 """
 
 import logging
-from typing import Annotated, Optional
+from typing import Annotated, Optional, Union
 
 import torch
 from torch import nn
@@ -120,7 +120,7 @@ class TextClassificationModel(nn.Module):
         categorical_vars: Annotated[torch.Tensor, "batch num_cats"],
         return_label_attention_matrix: bool = False,
         **kwargs,
-    ) -> torch.Tensor:
+    ) -> Union[torch.Tensor, dict[str, torch.Tensor]]:
         """
         Memory-efficient forward pass implementation.
 
@@ -128,10 +128,15 @@ class TextClassificationModel(nn.Module):
             input_ids (torch.Tensor[Long]), shape (batch_size, seq_len): Tokenized + padded text
             attention_mask (torch.Tensor[int]), shape (batch_size, seq_len): Attention mask indicating non-pad tokens
             categorical_vars (torch.Tensor[Long]): Additional categorical features, (batch_size, num_categorical_features)
+            return_label_attention_matrix (bool): If True, returns a dict with logits and label_attention_matrix
 
         Returns:
-            torch.Tensor: Model output scores for each class - shape (batch_size, num_classes)
-                Raw, not softmaxed.
+            Union[torch.Tensor, dict[str, torch.Tensor]]:
+                - If return_label_attention_matrix is False: torch.Tensor of shape (batch_size, num_classes) 
+                  containing raw logits (not softmaxed)
+                - If return_label_attention_matrix is True: dict with keys:
+                    - "logits": torch.Tensor of shape (batch_size, num_classes)
+                    - "label_attention_matrix": torch.Tensor of shape (batch_size, num_classes, seq_len)
         """
         encoded_text = input_ids  # clearer name
         if self.text_embedder is None:
