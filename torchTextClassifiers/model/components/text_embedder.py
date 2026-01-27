@@ -217,14 +217,20 @@ class TextEmbedder(nn.Module):
         if self.attention_config is not None:
             if self.attention_config.aggregation_method is not None:  # default is "mean"
                 if self.attention_config.aggregation_method == "first":
-                    return token_embeddings[:, 0, :]
+                    return {
+                        "sentence_embedding": token_embeddings[:, 0, :],
+                        "label_attention_matrix": None,
+                    }
                 elif self.attention_config.aggregation_method == "last":
-                    lengths = attention_mask.sum(dim=1).clamp(min=1)  # last non-pad token index + 1
-                    return token_embeddings[
-                        torch.arange(token_embeddings.size(0)),
-                        lengths - 1,
-                        :,
-                    ]
+                    lengths = attention_mask.sum(dim=1).clamp(min=1).long()  # last non-pad token index + 1
+                    return {
+                        "sentence_embedding": token_embeddings[
+                            torch.arange(token_embeddings.size(0)),
+                            lengths - 1,
+                            :,
+                        ],
+                        "label_attention_matrix": None,
+                    }
                 else:
                     if self.attention_config.aggregation_method != "mean":
                         raise ValueError(
