@@ -1,6 +1,6 @@
 import math
 from dataclasses import dataclass
-from typing import Optional
+from typing import Dict, Optional
 
 import torch
 import torch.nn as nn
@@ -198,15 +198,18 @@ class TextEmbedder(nn.Module):
         token_embeddings: torch.Tensor,
         attention_mask: torch.Tensor,
         return_label_attention_matrix: bool = False,
-    ) -> torch.Tensor:
+    ) -> Dict[str, Optional[torch.Tensor]]:
         """
         Compute sentence embedding from embedded tokens - "remove" second dimension.
 
         Args (output from dataset collate_fn):
             token_embeddings (torch.Tensor[Long]), shape (batch_size, seq_len, embedding_dim): Tokenized + padded text
             attention_mask (torch.Tensor[Long]), shape (batch_size, seq_len): Attention mask indicating non-pad tokens
+            return_label_attention_matrix (bool): Whether to compute and return the label attention matrix
         Returns:
-            torch.Tensor: Sentence embeddings, shape (batch_size, embedding_dim)
+            Dict[str, Optional[torch.Tensor]]: A dictionary containing:
+                - 'sentence_embedding': Sentence embeddings, shape (batch_size, embedding_dim) or (batch_size, n_labels, embedding_dim) if label attention is enabled
+                - 'label_attention_matrix': Attention matrix if label attention is enabled and return_label_attention_matrix is True, otherwise None
         """
 
         # average over non-pad token embeddings
