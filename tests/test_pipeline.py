@@ -94,7 +94,6 @@ def run_full_pipeline(
         label_attention_config=(
             LabelAttentionConfig(
                 n_head=attention_config.n_head,
-                n_kv_head=attention_config.n_kv_head,
                 num_classes=model_params["num_classes"],
             )
             if label_attention_enabled
@@ -156,7 +155,6 @@ def run_full_pipeline(
         label_attention_config=(
             LabelAttentionConfig(
                 n_head=attention_config.n_head,
-                n_kv_head=attention_config.n_kv_head,
                 num_classes=model_params["num_classes"],
             )
             if label_attention_enabled
@@ -199,9 +197,9 @@ def run_full_pipeline(
 
     # Test label attention assertions
     if label_attention_enabled:
-        assert predictions["label_attention_attributions"] is not None, (
-            "Label attention attributions should not be None when label_attention_enabled is True"
-        )
+        assert (
+            predictions["label_attention_attributions"] is not None
+        ), "Label attention attributions should not be None when label_attention_enabled is True"
         label_attention_attributions = predictions["label_attention_attributions"]
         expected_shape = (
             len(sample_text_data),  # batch_size
@@ -215,9 +213,9 @@ def run_full_pipeline(
         )
     else:
         # When label attention is not enabled, the attributions should be None
-        assert predictions.get("label_attention_attributions") is None, (
-            "Label attention attributions should be None when label_attention_enabled is False"
-        )
+        assert (
+            predictions.get("label_attention_attributions") is None
+        ), "Label attention attributions should be None when label_attention_enabled is False"
 
     # Test explainability functions
     text_idx = 0
