@@ -183,3 +183,4 @@ example_files/
 _site/
 .quarto/
 **/*.quarto_ipynb
+my_ttc/

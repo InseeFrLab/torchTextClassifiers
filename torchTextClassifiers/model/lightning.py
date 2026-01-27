@@ -102,6 +102,7 @@ class TextClassificationModule(pl.LightningModule):
         targets = batch["labels"]
 
         outputs = self.forward(batch)
+
         loss = self.loss(outputs, targets)
         self.log("val_loss", loss, on_epoch=True, on_step=False, prog_bar=True, sync_dist=True)
 

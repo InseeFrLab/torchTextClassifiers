@@ -29,6 +29,7 @@ from torchTextClassifiers.model.components import (
     CategoricalForwardType,
     CategoricalVariableNet,
     ClassificationHead,
+    LabelAttentionConfig,
     TextEmbedder,
     TextEmbedderConfig,
 )
@@ -53,6 +54,7 @@ class ModelConfig:
     categorical_embedding_dims: Optional[Union[List[int], int]] = None
     num_classes: Optional[int] = None
     attention_config: Optional[AttentionConfig] = None
+    label_attention_config: Optional[LabelAttentionConfig] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -140,6 +142,7 @@ class torchTextClassifiers:
         self.embedding_dim = model_config.embedding_dim
         self.categorical_vocabulary_sizes = model_config.categorical_vocabulary_sizes
         self.num_classes = model_config.num_classes
+        self.enable_label_attention = model_config.label_attention_config is not None
 
         if self.tokenizer.output_vectorized:
             self.text_embedder = None
@@ -153,6 +156,7 @@ class torchTextClassifiers:
                 embedding_dim=self.embedding_dim,
                 padding_idx=tokenizer.padding_idx,
                 attention_config=model_config.attention_config,
+                label_attention_config=model_config.label_attention_config,
             )
             self.text_embedder = TextEmbedder(
                 text_embedder_config=text_embedder_config,
@@ -174,7 +178,9 @@ class torchTextClassifiers:
 
         self.classification_head = ClassificationHead(
             input_dim=classif_head_input_dim,
-            num_classes=model_config.num_classes,
+            num_classes=1
+            if self.enable_label_attention
+            else model_config.num_classes,  # output dim is 1 when using label attention, because embeddings are (num_classes, embedding_dim)
         )
 
         self.pytorch_model = TextClassificationModel(
@@ -486,13 +492,15 @@ class torchTextClassifiers:
         self,
         X_test: np.ndarray,
         top_k=1,
-        explain=False,
+        explain_with_label_attention: bool = False,
+        explain_with_captum=False,
     ):
         """
         Args:
             X_test (np.ndarray): input data to predict on, shape (N,d) where the first column is text and the rest are categorical variables
             top_k (int): for each sentence, return the top_k most likely predictions (default: 1)
-            explain (bool): launch gradient integration to have an explanation of the prediction (default: False)
+            explain_with_label_attention (bool): if enabled, use attention matrix labels x tokens to have an explanation of the prediction (default: False)
+            explain_with_captum (bool): launch gradient integration with Captum for explanation (default: False)
 
         Returns: A dictionary containing the following fields:
                 - predictions (torch.Tensor, shape (len(text), top_k)): A tensor containing the top_k most likely codes to the query.
@@ -501,6 +509,7 @@ class torchTextClassifiers:
                     - attributions (torch.Tensor, shape (len(text), top_k, seq_len)): A tensor containing the attributions for each token in the text.
         """
 
+        explain = explain_with_label_attention or explain_with_captum
         if explain:
             return_offsets_mapping = True  # to be passed to the tokenizer
             return_word_ids = True
@@ -509,13 +518,19 @@ class torchTextClassifiers:
                     "Explainability is not supported when the tokenizer outputs vectorized text directly. Please use a tokenizer that outputs token IDs."
                 )
             else:
-                if not HAS_CAPTUM:
-                    raise ImportError(
-                        "Captum is not installed and is required for explainability. Run 'pip install/uv add torchFastText[explainability]'."
-                    )
-                lig = LayerIntegratedGradients(
-                    self.pytorch_model, self.pytorch_model.text_embedder.embedding_layer
-                )  # initialize a Captum layer gradient integrator
+                if explain_with_captum:
+                    if not HAS_CAPTUM:
+                        raise ImportError(
+                            "Captum is not installed and is required for explainability. Run 'pip install/uv add torchFastText[explainability]'."
+                        )
+                    lig = LayerIntegratedGradients(
+                        self.pytorch_model, self.pytorch_model.text_embedder.embedding_layer
+                    )  # initialize a Captum layer gradient integrator
+                if explain_with_label_attention:
+                    if not self.enable_label_attention:
+                        raise RuntimeError(
+                            "Label attention explainability is enabled, but the model was not configured with label attention. Please enable label attention in the model configuration during initialization and retrain."
+                        )
         else:
             return_offsets_mapping = False
             return_word_ids = False
@@ -547,9 +562,19 @@ class torchTextClassifiers:
         else:
             categorical_vars = torch.empty((encoded_text.shape[0], 0), dtype=torch.float32)
 
-        pred = self.pytorch_model(
-            encoded_text, attention_mask, categorical_vars
+        model_output = self.pytorch_model(
+            encoded_text,
+            attention_mask,
+            categorical_vars,
+            return_label_attention_matrix=explain_with_label_attention,
         )  # forward pass, contains the prediction scores (len(text), num_classes)
+        pred = (
+            model_output["logits"] if explain_with_label_attention else model_output
+        )  # (batch_size, num_classes)
+
+        label_attention_matrix = (
+            model_output["label_attention_matrix"] if explain_with_label_attention else None
+        )
 
         label_scores = pred.detach().cpu().softmax(dim=1)  # convert to probabilities
 
@@ -559,21 +584,28 @@ class torchTextClassifiers:
         confidence = torch.round(label_scores_topk.values, decimals=2)  # and their scores
 
         if explain:
-            all_attributions = []
-            for k in range(top_k):
-                attributions = lig.attribute(
-                    (encoded_text, attention_mask, categorical_vars),
-                    target=torch.Tensor(predictions[:, k]).long(),
-                )  # (batch_size, seq_len)
-                attributions = attributions.sum(dim=-1)
-                all_attributions.append(attributions.detach().cpu())
+            if explain_with_captum:
+                # Captum explanations
+                captum_attributions = []
+                for k in range(top_k):
+                    attributions = lig.attribute(
+                        (encoded_text, attention_mask, categorical_vars),
+                        target=torch.Tensor(predictions[:, k]).long(),
+                    )  # (batch_size, seq_len)
+                    attributions = attributions.sum(dim=-1)
+                    captum_attributions.append(attributions.detach().cpu())
 
-            all_attributions = torch.stack(all_attributions, dim=1)  # (batch_size, top_k, seq_len)
+                captum_attributions = torch.stack(
+                    captum_attributions, dim=1
+                )  # (batch_size, top_k, seq_len)
+            else:
+                captum_attributions = None
 
             return {
                 "prediction": predictions,
                 "confidence": confidence,
-                "attributions": all_attributions,
+                "captum_attributions": captum_attributions,
+                "label_attention_attributions": label_attention_matrix,
                 "offset_mapping": tokenize_output.offset_mapping,
                 "word_ids": tokenize_output.word_ids,
             }
@@ -665,6 +697,10 @@ class torchTextClassifiers:
 
         # Reconstruct model_config
         model_config = ModelConfig.from_dict(metadata["model_config"])
+        if isinstance(model_config.label_attention_config, dict):
+            model_config.label_attention_config = LabelAttentionConfig(
+                **model_config.label_attention_config
+            )
 
         # Create instance
         instance = cls(
