@@ -134,6 +134,7 @@ class TextClassificationModel(nn.Module):
                 Raw, not softmaxed.
         """
         encoded_text = input_ids  # clearer name
+        label_attention_matrix = None
         if self.text_embedder is None:
             x_text = encoded_text.float()
         else:
