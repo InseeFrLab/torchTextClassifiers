@@ -129,7 +129,7 @@ class TextEmbedder(nn.Module):
         input_ids: torch.Tensor,
         attention_mask: torch.Tensor,
         return_label_attention_matrix: bool = False,
-    ) -> dict[str, Optional[torch.Tensor]]:
+    ) -> Dict[str, Optional[torch.Tensor]]:
         """Converts input token IDs to their corresponding embeddings.
 
         Args:
@@ -222,14 +222,20 @@ class TextEmbedder(nn.Module):
         if self.attention_config is not None:
             if self.attention_config.aggregation_method is not None:  # default is "mean"
                 if self.attention_config.aggregation_method == "first":
-                    return token_embeddings[:, 0, :]
+                    return {
+                        "sentence_embedding": token_embeddings[:, 0, :],
+                        "label_attention_matrix": None,
+                    }
                 elif self.attention_config.aggregation_method == "last":
                     lengths = attention_mask.sum(dim=1).clamp(min=1)  # last non-pad token index + 1
-                    return token_embeddings[
-                        torch.arange(token_embeddings.size(0)),
-                        lengths - 1,
-                        :,
-                    ]
+                    return {
+                        "sentence_embedding": token_embeddings[
+                            torch.arange(token_embeddings.size(0)),
+                            lengths - 1,
+                            :,
+                        ],
+                        "label_attention_matrix": None,
+                    }
                 else:
                     if self.attention_config.aggregation_method != "mean":
                         raise ValueError(
