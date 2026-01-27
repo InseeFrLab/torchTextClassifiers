@@ -198,7 +198,7 @@ class TextEmbedder(nn.Module):
         token_embeddings: torch.Tensor,
         attention_mask: torch.Tensor,
         return_label_attention_matrix: bool = False,
-    ) -> torch.Tensor:
+    ) -> dict[str, Optional[torch.Tensor]]:
         """
         Compute sentence embedding from embedded tokens - "remove" second dimension.
 
@@ -206,7 +206,7 @@ class TextEmbedder(nn.Module):
             token_embeddings (torch.Tensor[Long]), shape (batch_size, seq_len, embedding_dim): Tokenized + padded text
             attention_mask (torch.Tensor[Long]), shape (batch_size, seq_len): Attention mask indicating non-pad tokens
         Returns:
-            torch.Tensor: Sentence embeddings, shape (batch_size, embedding_dim)
+            dict: Dictionary with keys 'sentence_embedding' (torch.Tensor) and 'label_attention_matrix' (Optional[torch.Tensor])
         """
 
         # average over non-pad token embeddings
