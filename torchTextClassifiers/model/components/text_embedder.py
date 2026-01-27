@@ -383,14 +383,14 @@ class LabelAttentionClassifier(nn.Module):
             # Compute attention scores
             # size (B, n_head, n_labels, seq_len)
             attention_scores = torch.matmul(q, k.transpose(-2, -1)) / (self.head_dim**0.5)
-            
+
             # Apply mask to attention scores before softmax
             if attention_mask is not None:
                 # attn_mask is already in the right shape: (B, 1, 1, T)
                 # We need to apply it to scores of shape (B, n_head, n_labels, T)
                 # Set masked positions to -inf so they become 0 after softmax
                 attention_scores = attention_scores.masked_fill(attn_mask, float('-inf'))
-            
+
             attention_matrix = torch.softmax(attention_scores, dim=-1)
 
         return {"sentence_embedding": y, "attention_matrix": attention_matrix}
