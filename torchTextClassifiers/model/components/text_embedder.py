@@ -12,7 +12,6 @@ from torchTextClassifiers.model.components.attention import AttentionConfig, Blo
 @dataclass
 class LabelAttentionConfig:
     n_head: int
-    n_kv_head: int
     num_classes: int
 
 
@@ -306,34 +305,29 @@ class LabelAttentionClassifier(nn.Module):
         self.embedding_dim = config.embedding_dim
         self.num_classes = label_attention_config.num_classes
         self.n_head = label_attention_config.n_head
-        self.n_kv_head = label_attention_config.n_kv_head
-        self.enable_gqa = (
-            self.n_head != self.n_kv_head
-        )  # Group Query Attention (GQA): duplicate key/value heads to match query heads if desired
-        
+
         # Validate head configuration
         self.head_dim = self.embedding_dim // self.n_head
-        
+
         if self.head_dim * self.n_head != self.embedding_dim:
             raise ValueError(
                 f"embedding_dim ({self.embedding_dim}) must be divisible by n_head ({self.n_head}). "
                 f"Got head_dim = {self.head_dim} with remainder {self.embedding_dim % self.n_head}"
             )
-        
-        if self.n_head % self.n_kv_head != 0:
-            raise ValueError(
-                f"n_head ({self.n_head}) must be divisible by n_kv_head ({self.n_kv_head}) for Group Query Attention. "
-                f"Got remainder {self.n_head % self.n_kv_head}"
-            )
 
         self.label_embeds = nn.Embedding(self.num_classes, self.embedding_dim)
 
         self.c_q = nn.Linear(self.embedding_dim, self.n_head * self.head_dim, bias=False)
-        self.c_k = nn.Linear(self.embedding_dim, self.n_kv_head * self.head_dim, bias=False)
-        self.c_v = nn.Linear(self.embedding_dim, self.n_kv_head * self.head_dim, bias=False)
+        self.c_k = nn.Linear(self.embedding_dim, self.n_head * self.head_dim, bias=False)
+        self.c_v = nn.Linear(self.embedding_dim, self.n_head * self.head_dim, bias=False)
         self.c_proj = nn.Linear(self.embedding_dim, self.embedding_dim, bias=False)
 
-    def forward(self, token_embeddings, attention_mask: Optional[torch.Tensor] = None, compute_attention_matrix: Optional[bool] = False):
+    def forward(
+        self,
+        token_embeddings,
+        attention_mask: Optional[torch.Tensor] = None,
+        compute_attention_matrix: Optional[bool] = False,
+    ):
         """
         Args:
             token_embeddings (torch.Tensor), shape (batch, seq_len, d_model): Embedded tokens from the text input.
@@ -362,8 +356,8 @@ class LabelAttentionClassifier(nn.Module):
         all_label_embeddings = norm(all_label_embeddings)
 
         q = self.c_q(all_label_embeddings).view(B, self.num_classes, self.n_head, self.head_dim)
-        k = self.c_k(token_embeddings).view(B, T, self.n_kv_head, self.head_dim)
-        v = self.c_v(token_embeddings).view(B, T, self.n_kv_head, self.head_dim)
+        k = self.c_k(token_embeddings).view(B, T, self.n_head, self.head_dim)
+        v = self.c_v(token_embeddings).view(B, T, self.n_head, self.head_dim)
 
         q, k = norm(q), norm(k)  # QK norm
         q, k, v = (
@@ -379,11 +373,11 @@ class LabelAttentionClassifier(nn.Module):
         attn_mask = None
         if attention_mask is not None:
             # Convert: 0 (padding) -> True (mask out), 1 (real) -> False (attend to)
-            attn_mask = (attention_mask == 0)  # (B, T)
+            attn_mask = attention_mask == 0  # (B, T)
             # Expand to (B, 1, 1, T) for broadcasting across heads and queries
             attn_mask = attn_mask.unsqueeze(1).unsqueeze(2)  # (B, 1, 1, T)
 
-        y = F.scaled_dot_product_attention(q, k, v, attn_mask=attn_mask, is_causal=False, enable_gqa=self.enable_gqa)
+        y = F.scaled_dot_product_attention(q, k, v, attn_mask=attn_mask, is_causal=False)
 
         # Re-assemble the heads side by side and project back to residual stream
         y = y.transpose(1, 2).contiguous().view(B, self.num_classes, -1)  # (bs, n_labels, d_model)
@@ -400,7 +394,7 @@ class LabelAttentionClassifier(nn.Module):
                 # attn_mask is already in the right shape: (B, 1, 1, T)
                 # We need to apply it to scores of shape (B, n_head, n_labels, T)
                 # Set masked positions to -inf so they become 0 after softmax
-                attention_scores = attention_scores.masked_fill(attn_mask, float('-inf'))
+                attention_scores = attention_scores.masked_fill(attn_mask, float("-inf"))
 
             attention_matrix = torch.softmax(attention_scores, dim=-1)
 
