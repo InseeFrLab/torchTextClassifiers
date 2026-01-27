@@ -142,12 +142,14 @@ class TextEmbedder(nn.Module):
 
                 - "sentence_embedding" (torch.Tensor): Text embeddings of shape
                   (batch_size, embedding_dim) if ``self.enable_label_attention`` is False,
-                  else (batch_size, num_labels, embedding_dim).
+                  else (batch_size, num_classes, embedding_dim), where ``num_classes``
+                  is the number of label classes.
 
                 - "label_attention_matrix" (Optional[torch.Tensor]): Label attention
-                  matrix of shape (batch_size, num_labels, seq_len) if
+                  matrix of shape (batch_size, n_head, num_classes, seq_len) if
                   ``return_label_attention_matrix`` is True and label attention is
-                  enabled, otherwise ``None``.
+                  enabled, otherwise ``None``. The dimensions correspond to
+                  (batch_size, attention heads, label classes, sequence length).
         """
 
         encoded_text = input_ids  # clearer name
