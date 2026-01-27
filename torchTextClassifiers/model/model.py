@@ -132,15 +132,20 @@ class TextClassificationModel(nn.Module):
 
         Returns:
             Union[torch.Tensor, dict[str, torch.Tensor]]:
-                - If return_label_attention_matrix is False: torch.Tensor of shape (batch_size, num_classes) 
+                - If return_label_attention_matrix is False: torch.Tensor of shape (batch_size, num_classes)
                   containing raw logits (not softmaxed)
                 - If return_label_attention_matrix is True: dict with keys:
                     - "logits": torch.Tensor of shape (batch_size, num_classes)
                     - "label_attention_matrix": torch.Tensor of shape (batch_size, num_classes, seq_len)
         """
         encoded_text = input_ids  # clearer name
+        label_attention_matrix = None
         if self.text_embedder is None:
             x_text = encoded_text.float()
+            if return_label_attention_matrix:
+                raise ValueError(
+                    "return_label_attention_matrix=True requires a text_embedder with label attention enabled"
+                )
         else:
             text_embed_output = self.text_embedder(
                 input_ids=encoded_text,
