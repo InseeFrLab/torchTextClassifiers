@@ -1,11 +1,18 @@
 import math
 from dataclasses import dataclass
-from typing import Optional
+from typing import Dict, Optional
 
 import torch
-from torch import nn
+import torch.nn as nn
+from torch.nn import functional as F
 
 from torchTextClassifiers.model.components.attention import AttentionConfig, Block, norm
+
+
+@dataclass
+class LabelAttentionConfig:
+    n_head: int
+    num_classes: int
 
 
 @dataclass
@@ -14,6 +21,7 @@ class TextEmbedderConfig:
     embedding_dim: int
     padding_idx: int
     attention_config: Optional[AttentionConfig] = None
+    label_attention_config: Optional[LabelAttentionConfig] = None
 
 
 class TextEmbedder(nn.Module):
@@ -26,8 +34,17 @@ class TextEmbedder(nn.Module):
         if isinstance(self.attention_config, dict):
             self.attention_config = AttentionConfig(**self.attention_config)
 
-        if self.attention_config is not None:
-            self.attention_config.n_embd = text_embedder_config.embedding_dim
+        # Normalize label_attention_config: allow dicts and convert them to LabelAttentionConfig
+        self.label_attention_config = text_embedder_config.label_attention_config
+        if isinstance(self.label_attention_config, dict):
+            self.label_attention_config = LabelAttentionConfig(**self.label_attention_config)
+            # Keep self.config in sync so downstream components (e.g., LabelAttentionClassifier)
+            # always see a LabelAttentionConfig instance rather than a raw dict.
+            self.config.label_attention_config = self.label_attention_config
+
+        self.enable_label_attention = self.label_attention_config is not None
+        if self.enable_label_attention:
+            self.label_attention_module = LabelAttentionClassifier(self.config)
 
         self.vocab_size = text_embedder_config.vocab_size
         self.embedding_dim = text_embedder_config.embedding_dim
@@ -40,6 +57,7 @@ class TextEmbedder(nn.Module):
         )
 
         if self.attention_config is not None:
+            self.attention_config.n_embd = text_embedder_config.embedding_dim
             self.transformer = nn.ModuleDict(
                 {
                     "h": nn.ModuleList(
@@ -105,8 +123,33 @@ class TextEmbedder(nn.Module):
         elif isinstance(module, nn.Embedding):
             torch.nn.init.normal_(module.weight, mean=0.0, std=1.0)
 
-    def forward(self, input_ids: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
-        """Converts input token IDs to their corresponding embeddings."""
+    def forward(
+        self,
+        input_ids: torch.Tensor,
+        attention_mask: torch.Tensor,
+        return_label_attention_matrix: bool = False,
+    ) -> Dict[str, Optional[torch.Tensor]]:
+        """Converts input token IDs to their corresponding embeddings.
+
+        Args:
+            input_ids (torch.Tensor[Long]), shape (batch_size, seq_len): Tokenized
+            attention_mask (torch.Tensor[Long]), shape (batch_size, seq_len): Attention mask indicating non-pad tokens
+            return_label_attention_matrix (bool): Whether to return the label attention matrix.
+
+        Returns:
+            dict: A dictionary with the following keys:
+
+                - "sentence_embedding" (torch.Tensor): Text embeddings of shape
+                  (batch_size, embedding_dim) if ``self.enable_label_attention`` is False,
+                  else (batch_size, num_classes, embedding_dim), where ``num_classes``
+                  is the number of label classes.
+
+                - "label_attention_matrix" (Optional[torch.Tensor]): Label attention
+                  matrix of shape (batch_size, n_head, num_classes, seq_len) if
+                  ``return_label_attention_matrix`` is True and label attention is
+                  enabled, otherwise ``None``. The dimensions correspond to
+                  (batch_size, attention heads, label classes, sequence length).
+        """
 
         encoded_text = input_ids  # clearer name
         if encoded_text.dtype != torch.long:
@@ -138,23 +181,36 @@ class TextEmbedder(nn.Module):
 
             token_embeddings = norm(token_embeddings)
 
-        text_embedding = self._get_sentence_embedding(
-            token_embeddings=token_embeddings, attention_mask=attention_mask
+        out = self._get_sentence_embedding(
+            token_embeddings=token_embeddings,
+            attention_mask=attention_mask,
+            return_label_attention_matrix=return_label_attention_matrix,
         )
 
-        return text_embedding
+        text_embedding = out["sentence_embedding"]
+        label_attention_matrix = out["label_attention_matrix"]
+        return {
+            "sentence_embedding": text_embedding,
+            "label_attention_matrix": label_attention_matrix,
+        }
 
     def _get_sentence_embedding(
-        self, token_embeddings: torch.Tensor, attention_mask: torch.Tensor
-    ) -> torch.Tensor:
+        self,
+        token_embeddings: torch.Tensor,
+        attention_mask: torch.Tensor,
+        return_label_attention_matrix: bool = False,
+    ) -> Dict[str, Optional[torch.Tensor]]:
         """
         Compute sentence embedding from embedded tokens - "remove" second dimension.
 
         Args (output from dataset collate_fn):
             token_embeddings (torch.Tensor[Long]), shape (batch_size, seq_len, embedding_dim): Tokenized + padded text
             attention_mask (torch.Tensor[Long]), shape (batch_size, seq_len): Attention mask indicating non-pad tokens
+            return_label_attention_matrix (bool): Whether to compute and return the label attention matrix
         Returns:
-            torch.Tensor: Sentence embeddings, shape (batch_size, embedding_dim)
+            Dict[str, Optional[torch.Tensor]]: A dictionary containing:
+                - 'sentence_embedding': Sentence embeddings, shape (batch_size, embedding_dim) or (batch_size, n_labels, embedding_dim) if label attention is enabled
+                - 'label_attention_matrix': Attention matrix if label attention is enabled and return_label_attention_matrix is True, otherwise None
         """
 
         # average over non-pad token embeddings
@@ -163,16 +219,22 @@ class TextEmbedder(nn.Module):
         # mask pad-tokens
 
         if self.attention_config is not None:
-            if self.attention_config.aggregation_method is not None:
+            if self.attention_config.aggregation_method is not None:  # default is "mean"
                 if self.attention_config.aggregation_method == "first":
-                    return token_embeddings[:, 0, :]
+                    return {
+                        "sentence_embedding": token_embeddings[:, 0, :],
+                        "label_attention_matrix": None,
+                    }
                 elif self.attention_config.aggregation_method == "last":
                     lengths = attention_mask.sum(dim=1).clamp(min=1)  # last non-pad token index + 1
-                    return token_embeddings[
-                        torch.arange(token_embeddings.size(0)),
-                        lengths - 1,
-                        :,
-                    ]
+                    return {
+                        "sentence_embedding": token_embeddings[
+                            torch.arange(token_embeddings.size(0)),
+                            lengths - 1,
+                            :,
+                        ],
+                        "label_attention_matrix": None,
+                    }
                 else:
                     if self.attention_config.aggregation_method != "mean":
                         raise ValueError(
@@ -181,25 +243,31 @@ class TextEmbedder(nn.Module):
 
         assert self.attention_config is None or self.attention_config.aggregation_method == "mean"
 
-        mask = attention_mask.unsqueeze(-1).float()  # (batch_size, seq_len, 1)
-        masked_embeddings = token_embeddings * mask  # (batch_size, seq_len, embedding_dim)
-
-        sentence_embedding = masked_embeddings.sum(dim=1) / mask.sum(dim=1).clamp(
-            min=1.0
-        )  # avoid division by zero
-
-        sentence_embedding = torch.nan_to_num(sentence_embedding, 0.0)
-
-        return sentence_embedding
-
-    def __call__(self, *args, **kwargs):
-        out = super().__call__(*args, **kwargs)
-        if out.dim() != 2:
-            raise ValueError(
-                f"Output of {self.__class__.__name__}.forward must be 2D "
-                f"(got shape {tuple(out.shape)})"
+        if self.enable_label_attention:
+            label_attention_result = self.label_attention_module(
+                token_embeddings,
+                attention_mask=attention_mask,
+                compute_attention_matrix=return_label_attention_matrix,
             )
-        return out
+            sentence_embedding = label_attention_result[
+                "sentence_embedding"
+            ]  # (bs, n_labels, d_embed), so classifier needs to be a (d_embed, 1) matrix
+            label_attention_matrix = label_attention_result["attention_matrix"]
+
+        else:  # sentence embedding = mean of (non-pad) token embeddings
+            mask = attention_mask.unsqueeze(-1).float()  # (batch_size, seq_len, 1)
+            masked_embeddings = token_embeddings * mask  # (batch_size, seq_len, embedding_dim)
+            sentence_embedding = masked_embeddings.sum(dim=1) / mask.sum(dim=1).clamp(
+                min=1.0
+            )  # avoid division by zero
+
+            sentence_embedding = torch.nan_to_num(sentence_embedding, 0.0)
+            label_attention_matrix = None
+
+        return {
+            "sentence_embedding": sentence_embedding,
+            "label_attention_matrix": label_attention_matrix,
+        }
 
     def _precompute_rotary_embeddings(self, seq_len, head_dim, base=10000, device=None):
         # autodetect the device from model embeddings
@@ -221,3 +289,113 @@ class TextEmbedder(nn.Module):
         )  # add batch and head dims for later broadcasting
 
         return cos, sin
+
+
+class LabelAttentionClassifier(nn.Module):
+    """
+    A head for aggregating token embeddings into label-specific sentence embeddings using cross-attention mechanism.
+    Labels are queries that attend over token embeddings (keys and values) to produce label-specific embeddings.
+
+    """
+
+    def __init__(self, config: TextEmbedderConfig):
+        super().__init__()
+
+        label_attention_config = config.label_attention_config
+        self.embedding_dim = config.embedding_dim
+        self.num_classes = label_attention_config.num_classes
+        self.n_head = label_attention_config.n_head
+
+        # Validate head configuration
+        self.head_dim = self.embedding_dim // self.n_head
+
+        if self.head_dim * self.n_head != self.embedding_dim:
+            raise ValueError(
+                f"embedding_dim ({self.embedding_dim}) must be divisible by n_head ({self.n_head}). "
+                f"Got head_dim = {self.head_dim} with remainder {self.embedding_dim % self.n_head}"
+            )
+
+        self.label_embeds = nn.Embedding(self.num_classes, self.embedding_dim)
+
+        self.c_q = nn.Linear(self.embedding_dim, self.n_head * self.head_dim, bias=False)
+        self.c_k = nn.Linear(self.embedding_dim, self.n_head * self.head_dim, bias=False)
+        self.c_v = nn.Linear(self.embedding_dim, self.n_head * self.head_dim, bias=False)
+        self.c_proj = nn.Linear(self.embedding_dim, self.embedding_dim, bias=False)
+
+    def forward(
+        self,
+        token_embeddings,
+        attention_mask: Optional[torch.Tensor] = None,
+        compute_attention_matrix: Optional[bool] = False,
+    ):
+        """
+        Args:
+            token_embeddings (torch.Tensor), shape (batch, seq_len, d_model): Embedded tokens from the text input.
+            attention_mask (torch.Tensor, optional), shape (batch, seq_len): Attention mask indicating non-pad tokens (1 for real tokens, 0 for padding).
+            compute_attention_matrix (bool): Whether to compute and return the attention matrix.
+        Returns:
+            dict: {
+                "sentence_embedding": torch.Tensor, shape (batch, num_classes, d_model): Label-specific sentence embeddings.
+                "attention_matrix": Optional[torch.Tensor], shape (batch, n_head, num_classes, seq_len): Attention weights if compute_attention_matrix is True, else None.
+            }
+
+        """
+        B, T, C = token_embeddings.size()
+        if isinstance(compute_attention_matrix, torch.Tensor):
+            compute_attention_matrix = compute_attention_matrix[0].item()
+        compute_attention_matrix = bool(compute_attention_matrix)
+
+        # 1. Create label indices [0, 1, ..., C-1] for the whole batch
+        label_indices = torch.arange(
+            self.num_classes, dtype=torch.long, device=token_embeddings.device
+        ).expand(B, -1)
+
+        all_label_embeddings = self.label_embeds(
+            label_indices
+        )  # Shape: [batch, num_classes, d_model]
+        all_label_embeddings = norm(all_label_embeddings)
+
+        q = self.c_q(all_label_embeddings).view(B, self.num_classes, self.n_head, self.head_dim)
+        k = self.c_k(token_embeddings).view(B, T, self.n_head, self.head_dim)
+        v = self.c_v(token_embeddings).view(B, T, self.n_head, self.head_dim)
+
+        q, k = norm(q), norm(k)  # QK norm
+        q, k, v = (
+            q.transpose(1, 2),
+            k.transpose(1, 2),
+            v.transpose(1, 2),
+        )  # make head be batch dim, i.e. (B, T, H, D) -> (B, H, T, D)
+
+        # Prepare attention mask for scaled_dot_product_attention
+        # attention_mask: (B, T) with 1 for real tokens, 0 for padding
+        # scaled_dot_product_attention expects attn_mask: (B, H, Q, K) or broadcastable shape
+        # where True means "mask out" (ignore), False means "attend to"
+        attn_mask = None
+        if attention_mask is not None:
+            # Convert: 0 (padding) -> True (mask out), 1 (real) -> False (attend to)
+            attn_mask = attention_mask == 0  # (B, T)
+            # Expand to (B, 1, 1, T) for broadcasting across heads and queries
+            attn_mask = attn_mask.unsqueeze(1).unsqueeze(2)  # (B, 1, 1, T)
+
+        y = F.scaled_dot_product_attention(q, k, v, attn_mask=attn_mask, is_causal=False)
+
+        # Re-assemble the heads side by side and project back to residual stream
+        y = y.transpose(1, 2).contiguous().view(B, self.num_classes, -1)  # (bs, n_labels, d_model)
+        y = self.c_proj(y)
+
+        attention_matrix = None
+        if compute_attention_matrix:
+            # Compute attention scores
+            # size (B, n_head, n_labels, seq_len)
+            attention_scores = torch.matmul(q, k.transpose(-2, -1)) / (self.head_dim**0.5)
+
+            # Apply mask to attention scores before softmax
+            if attention_mask is not None:
+                # attn_mask is already in the right shape: (B, 1, 1, T)
+                # We need to apply it to scores of shape (B, n_head, n_labels, T)
+                # Set masked positions to -inf so they become 0 after softmax
+                attention_scores = attention_scores.masked_fill(attn_mask, float("-inf"))
+
+            attention_matrix = torch.softmax(attention_scores, dim=-1)
+
+        return {"sentence_embedding": y, "attention_matrix": attention_matrix}

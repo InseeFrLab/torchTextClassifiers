@@ -43,7 +43,7 @@ pip install torchTextclassifiers[huggingface]
 ```bash
 # Clone the repository
 git clone https://github.com/InseeFrLab/torchTextClassifiers.git
-cd torchtextClassifiers
+cd torchTextClassifiers
 
 # Install with uv (recommended)
 uv sync
