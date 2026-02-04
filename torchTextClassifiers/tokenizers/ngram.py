@@ -432,11 +432,24 @@ class NGramTokenizer(BaseTokenizer):
         print(f"✓ Tokenizer saved to {save_directory}")
 
     @classmethod
-    def from_pretrained(cls, directory: str):
+    def load_from_s3(cls, s3_path: str, filesystem):
         """Load tokenizer from saved configuration."""
-        with open(f"{directory}/tokenizer.json", "r") as f:
-            config = json.load(f)
 
+        config = json.load(filesystem.open(s3_path, "r"))
+        tokenizer = cls.build_from_config(config)
+        return tokenizer
+
+    @classmethod
+    def load(cls, path: str):
+        """Load tokenizer from saved configuration."""
+
+        with open(path, "r") as f:
+            config = json.load(f)
+        tokenizer = cls.build_from_config(config)
+        return tokenizer
+
+    @classmethod
+    def build_from_config(cls, config):
         tokenizer = cls(
             min_count=config["min_count"],
             min_n=config["min_n"],
@@ -468,5 +481,4 @@ class NGramTokenizer(BaseTokenizer):
         )
         print("✓ Subword cache built")
 
-        print(f"✓ Tokenizer loaded from {directory}")
         return tokenizer

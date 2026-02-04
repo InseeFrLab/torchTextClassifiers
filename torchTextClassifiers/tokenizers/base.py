@@ -103,6 +103,11 @@ class BaseTokenizer(ABC):
     def __call__(self, text: Union[str, List[str]], **kwargs) -> list:
         return self.tokenize(text, **kwargs)
 
+    @classmethod
+    @abstractmethod
+    def load_from_s3(cls, s3_path: str, filesystem):
+        pass
+
 
 class HuggingFaceTokenizer(BaseTokenizer):
     def __init__(
