@@ -178,17 +178,14 @@ class HuggingFaceTokenizer(BaseTokenizer):
     @classmethod
     def load_from_s3(cls, s3_path: str, filesystem):
         if filesystem.exists(s3_path) is False:
-            raise FileNotFoundError(
-                f"Tokenizer not found at {s3_path}. Please train it first (see src/train_tokenizers)."
-            )
+            raise FileNotFoundError(f"Tokenizer not found at {s3_path}.")
 
         with filesystem.open(s3_path, "rb") as f:
             json_str = f.read().decode("utf-8")
 
         tokenizer_obj = Tokenizer.from_str(json_str)
-        tokenizer = PreTrainedTokenizerFast(tokenizer_object=tokenizer_obj)
-        instance = cls(vocab_size=len(tokenizer), trained=True)
-        instance.tokenizer = tokenizer
+        instance = cls(vocab_size=tokenizer_obj.get_vocab_size(), trained=True)
+        instance.tokenizer = tokenizer_obj
         instance._post_training()
         return instance
 
