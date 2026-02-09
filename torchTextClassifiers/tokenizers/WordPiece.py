@@ -82,7 +82,7 @@ class WordPieceTokenizer(HuggingFaceTokenizer):
         self._post_training()
 
         if save_path:
-            self.tokenizer.save(save_path)
+            self.tokenizer.save_pretrained(save_path)
             logger.info(f"💾 Tokenizer saved at {save_path}")
             if filesystem and s3_save_path:
                 parent_dir = os.path.dirname(save_path)
