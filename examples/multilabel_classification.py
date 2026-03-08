@@ -68,40 +68,42 @@ ttc_ragged = torchTextClassifiers(
     ragged_multilabel=True,  # Key for ragged list input!
 )
 
-print("Starting training with ragged labels...")
-ttc_ragged.train(
-    X_train=X,
-    y_train=Y_ragged,
-    training_config=training_config,
-)
+if __name__ == "__main__":
 
-# Behind the scenes, the ragged lists are converted into a binary matrix (one-hot version).
+    print("Starting training with ragged labels...")
+    ttc_ragged.train(
+        X_train=X,
+        y_train=Y_ragged,
+        training_config=training_config,
+    )
 
-# ==========================================
-# 2. One-hot / multidimensional output approach
-# ==========================================
+    # Behind the scenes, the ragged lists are converted into a binary matrix (one-hot version).
 
-# You can also provide a one-hot/multidimensional array (or float probabilities).
-# Here, each row is a vector of size equal to the number of labels.
-labels_one_hot = [
-    [1., 1., 0., 0., 0., 1.],
-    [1., 0., 0., 0., 1., 0.],
-    [0., 1., 0., 0., 0., 1.],
-    [1., 1., 0., 0., 1., 0.],
-    [0., 1., 0., 0., 0., 1.],
-    [1., 0., 0., 0., 1., 0.]
-]
-Y_one_hot = np.array(labels_one_hot)
+    # ==========================================
+    # 2. One-hot / multidimensional output approach
+    # ==========================================
 
-# When using one-hot/dense arrays, set ragged_multilabel=False (default)
-ttc_dense = torchTextClassifiers(
-    tokenizer=tokenizer,
-    model_config=model_config,
-)
+    # You can also provide a one-hot/multidimensional array (or float probabilities).
+    # Here, each row is a vector of size equal to the number of labels.
+    labels_one_hot = [
+        [1., 1., 0., 0., 0., 1.],
+        [1., 0., 0., 0., 1., 0.],
+        [0., 1., 0., 0., 0., 1.],
+        [1., 1., 0., 0., 1., 0.],
+        [0., 1., 0., 0., 0., 1.],
+        [1., 0., 0., 0., 1., 0.]
+    ]
+    Y_one_hot = np.array(labels_one_hot)
 
-print("\nStarting training with one-hot labels...")
-ttc_dense.train(
-    X_train=X,
-    y_train=Y_one_hot,
-    training_config=training_config,
-)
+    # When using one-hot/dense arrays, set ragged_multilabel=False (default)
+    ttc_dense = torchTextClassifiers(
+        tokenizer=tokenizer,
+        model_config=model_config,
+    )
+
+    print("\nStarting training with one-hot labels...")
+    ttc_dense.train(
+        X_train=X,
+        y_train=Y_one_hot,
+        training_config=training_config,
+    )
