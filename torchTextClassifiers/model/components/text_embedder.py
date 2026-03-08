@@ -320,10 +320,7 @@ class LabelAttentionClassifier(nn.Module):
         self.head_dim = self.embedding_dim // self.n_head
 
         if self.head_dim * self.n_head != self.embedding_dim:
-            raise ValueError(
-                f"embedding_dim ({self.embedding_dim}) must be divisible by n_head ({self.n_head}). "
-                f"Got head_dim = {self.head_dim} with remainder {self.embedding_dim % self.n_head}"
-            )
+            raise ValueError("embedding_dim must be divisible by n_head.")
 
         self.label_embeds = nn.Embedding(self.num_classes, self.embedding_dim)
 
