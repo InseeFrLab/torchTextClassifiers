@@ -302,7 +302,7 @@ class torchTextClassifiers:
             texts=X_train["text"],
             categorical_variables=X_train["categorical_variables"],  # None if no cat vars
             tokenizer=self.tokenizer,
-            labels=y_train.tolist(),
+            labels=y_train.tolist() if not isinstance(y_train, list) else y_train,
             ragged_multilabel=self.ragged_multilabel,
         )
         train_dataloader = train_dataset.create_dataloader(

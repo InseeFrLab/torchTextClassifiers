@@ -42,7 +42,7 @@ class TextEmbedder(nn.Module):
             # always see a LabelAttentionConfig instance rather than a raw dict.
             self.config.label_attention_config = self.label_attention_config
 
-        self.enable_label_attention = self.label_attention_config is not None
+        self.enable_label_attention = self.label_attention_config is not None and getattr(self.label_attention_config, 'n_head', None) is not None
         if self.enable_label_attention:
             self.label_attention_module = LabelAttentionClassifier(self.config)
 
@@ -58,6 +58,16 @@ class TextEmbedder(nn.Module):
 
         if self.attention_config is not None:
             self.attention_config.n_embd = text_embedder_config.embedding_dim
+
+            if self.attention_config.n_embd is None:
+                raise ValueError("n_embd must be specified in AttentionConfig or embedding_dim in TextEmbedderConfig.")
+            if self.attention_config.n_head is None:
+                raise ValueError("n_head must be specified in AttentionConfig.")
+            if self.attention_config.n_layers is None:
+                raise ValueError("n_layers must be specified in AttentionConfig.")
+            if self.attention_config.n_kv_head is None:
+                raise ValueError("n_kv_head must be specified in AttentionConfig.")
+
             self.transformer = nn.ModuleDict(
                 {
                     "h": nn.ModuleList(
@@ -72,12 +82,12 @@ class TextEmbedder(nn.Module):
             head_dim = self.attention_config.n_embd // self.attention_config.n_head
 
             if head_dim * self.attention_config.n_head != self.attention_config.n_embd:
-                raise ValueError("embedding_dim must be divisible by n_head.")
+                raise ValueError(f"embedding_dim ({self.attention_config.n_embd}) must be divisible by n_head ({self.attention_config.n_head}). Got head_dim = {head_dim}")
 
             if self.attention_config.positional_encoding:
                 if head_dim % 2 != 0:
                     raise ValueError(
-                        "embedding_dim / n_head must be even for rotary positional embeddings."
+                        f"embedding_dim / n_head ({head_dim}) must be even for rotary positional embeddings."
                     )
 
                 if self.attention_config.sequence_len is None:
