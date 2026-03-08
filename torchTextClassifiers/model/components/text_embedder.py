@@ -42,7 +42,7 @@ class TextEmbedder(nn.Module):
             # always see a LabelAttentionConfig instance rather than a raw dict.
             self.config.label_attention_config = self.label_attention_config
 
-        self.enable_label_attention = self.label_attention_config is not None
+        self.enable_label_attention = self.label_attention_config is not None and getattr(self.label_attention_config, 'n_head', None) is not None
         if self.enable_label_attention:
             self.label_attention_module = LabelAttentionClassifier(self.config)
 
@@ -58,6 +58,16 @@ class TextEmbedder(nn.Module):
 
         if self.attention_config is not None:
             self.attention_config.n_embd = text_embedder_config.embedding_dim
+
+            if self.attention_config.n_embd is None:
+                raise ValueError("n_embd must be specified in AttentionConfig or embedding_dim in TextEmbedderConfig.")
+            if self.attention_config.n_head is None:
+                raise ValueError("n_head must be specified in AttentionConfig.")
+            if self.attention_config.n_layers is None:
+                raise ValueError("n_layers must be specified in AttentionConfig.")
+            if self.attention_config.n_kv_head is None:
+                raise ValueError("n_kv_head must be specified in AttentionConfig.")
+
             self.transformer = nn.ModuleDict(
                 {
                     "h": nn.ModuleList(
