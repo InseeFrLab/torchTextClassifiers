@@ -87,7 +87,7 @@ class TextEmbedder(nn.Module):
             if self.attention_config.positional_encoding:
                 if head_dim % 2 != 0:
                     raise ValueError(
-                        f"embedding_dim / n_head ({head_dim}) must be even for rotary positional embeddings."
+                        "embedding_dim / n_head must be even for rotary positional embeddings."
                     )
 
                 if self.attention_config.sequence_len is None:
