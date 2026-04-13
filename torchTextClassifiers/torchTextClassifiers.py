@@ -22,6 +22,7 @@ from pytorch_lightning.callbacks import (
     ModelCheckpoint,
 )
 
+from torchTextClassifiers.categorical_value_encoder import CategoricalValueEncoder
 from torchTextClassifiers.dataset import TextClassificationDataset
 from torchTextClassifiers.model import TextClassificationModel, TextClassificationModule
 from torchTextClassifiers.model.components import (
@@ -106,31 +107,44 @@ class torchTextClassifiers:
         tokenizer: BaseTokenizer,
         model_config: ModelConfig,
         ragged_multilabel: bool = False,
+        categorical_encoder: Optional[CategoricalValueEncoder] = None,
     ):
         """Initialize the torchTextClassifiers instance.
 
         Args:
             tokenizer: A tokenizer instance for text preprocessing
             model_config: Configuration parameters for the text classification model
+            ragged_multilabel: Whether to use ragged multilabel classification
+            categorical_encoder: Optional CategoricalValueEncoder for encoding
+                raw string (or mixed) categorical values to integers. Build it
+                beforehand from DictEncoder or sklearn LabelEncoder instances and
+                pass it here. If None, categorical columns in X must already be
+                integer-encoded.
 
         Example:
             >>> from torchTextClassifiers import ModelConfig, TrainingConfig, torchTextClassifiers
-            >>>  # Assume tokenizer is a trained BaseTokenizer instance
+            >>> from torchTextClassifiers.categorical_value_encoder import CategoricalValueEncoder, DictEncoder
+            >>> # Build one DictEncoder per categorical feature
+            >>> encoders = {str(i): DictEncoder({v: j for j, v in enumerate(sorted(set(X_categorical[:, i])))})
+            ...             for i in range(X_categorical.shape[1])}
+            >>> encoder = CategoricalValueEncoder(encoders)
             >>> model_config = ModelConfig(
             ...     embedding_dim=10,
-            ...     categorical_vocabulary_sizes=[30, 25],
+            ...     categorical_vocabulary_sizes=encoder.vocabulary_sizes,
             ...     categorical_embedding_dims=[10, 5],
             ...     num_classes=10,
             ... )
             >>> ttc = torchTextClassifiers(
             ...     tokenizer=tokenizer,
             ...     model_config=model_config,
+            ...     categorical_encoder=encoder,
             ... )
         """
 
         self.model_config = model_config
         self.tokenizer = tokenizer
         self.ragged_multilabel = ragged_multilabel
+        self.categorical_encoder: CategoricalValueEncoder | None = categorical_encoder
 
         if hasattr(self.tokenizer, "trained"):
             if not self.tokenizer.trained:
@@ -240,26 +254,39 @@ class torchTextClassifiers:
                 ...     training_config=training_config,
                 ... )
         """
+
+        if X_train[:, 1:].dtype != np.int64:
+            if self.categorical_encoder is not None:
+                if verbose:
+                    logger.info("Encoding categorical variables in training data...")
+                X_train[:, 1:] = self.categorical_encoder.transform(X_train[:, 1:])
+            else:
+                raise ValueError(
+                    "Categorical variables must be integer-encoded: provide a CategoricalValueEncoder."
+                )
+
         # Input validation
-        X_train, y_train = self._check_XY(X_train, y_train)
+        X_train_checked, y_train = self._check_XY(X_train, y_train)
 
         if X_val is not None:
             assert y_val is not None, "y_val must be provided if X_val is provided."
         if y_val is not None:
             assert X_val is not None, "X_val must be provided if y_val is provided."
 
+        X_val_checked: Optional[Dict[str, Any]] = None
         if X_val is not None and y_val is not None:
-            X_val, y_val = self._check_XY(X_val, y_val)
+            X_val_checked, y_val = self._check_XY(X_val, y_val)
 
         if (
-            X_train["categorical_variables"] is not None
-            and X_val["categorical_variables"] is not None
+            X_train_checked["categorical_variables"] is not None
+            and X_val_checked is not None
+            and X_val_checked["categorical_variables"] is not None
         ):
             assert (
-                X_train["categorical_variables"].ndim > 1
-                and X_train["categorical_variables"].shape[1]
-                == X_val["categorical_variables"].shape[1]
-                or X_val["categorical_variables"].ndim == 1
+                X_train_checked["categorical_variables"].ndim > 1
+                and X_train_checked["categorical_variables"].shape[1]
+                == X_val_checked["categorical_variables"].shape[1]
+                or X_val_checked["categorical_variables"].ndim == 1
             ), "X_train and X_val must have the same number of columns."
 
         if verbose:
@@ -299,8 +326,8 @@ class torchTextClassifiers:
             logger.info(f"Running on: {device}")
 
         train_dataset = TextClassificationDataset(
-            texts=X_train["text"],
-            categorical_variables=X_train["categorical_variables"],  # None if no cat vars
+            texts=X_train_checked["text"],
+            categorical_variables=X_train_checked["categorical_variables"],  # None if no cat vars
             tokenizer=self.tokenizer,
             labels=y_train.tolist(),
             ragged_multilabel=self.ragged_multilabel,
@@ -312,10 +339,10 @@ class torchTextClassifiers:
             **training_config.dataloader_params if training_config.dataloader_params else {},
         )
 
-        if X_val is not None and y_val is not None:
+        if X_val_checked is not None and y_val is not None:
             val_dataset = TextClassificationDataset(
-                texts=X_val["text"],
-                categorical_variables=X_val["categorical_variables"],  # None if no cat vars
+                texts=X_val_checked["text"],
+                categorical_variables=X_val_checked["categorical_variables"],  # None if no cat vars
                 tokenizer=self.tokenizer,
                 labels=y_val,
                 ragged_multilabel=self.ragged_multilabel,
@@ -390,14 +417,14 @@ class torchTextClassifiers:
 
         self.lightning_module.eval()
 
-    def _check_XY(self, X: np.ndarray, Y: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        X = self._check_X(X)
-        Y = self._check_Y(Y)
+    def _check_XY(self, X: np.ndarray, Y: np.ndarray) -> Tuple[Dict[str, Any], np.ndarray]:
+        X_checked = self._check_X(X)
+        Y_checked = self._check_Y(Y)
 
-        if X["text"].shape[0] != len(Y):
+        if X_checked["text"].shape[0] != len(Y_checked):
             raise ValueError("X_train and y_train must have the same number of observations.")
 
-        return X, Y
+        return X_checked, Y_checked
 
     @staticmethod
     def _check_text_col(X):
@@ -415,46 +442,48 @@ class torchTextClassifiers:
 
         return text
 
-    def _check_categorical_variables(self, X: np.ndarray) -> None:
-        """Check if categorical variables in X match training configuration.
+    def _check_categorical_variables(self, X: np.ndarray) -> np.ndarray:
+        """Validate and encode categorical variables from X.
+
+        If a ``categorical_encoder`` was provided at initialization, raw string
+        or mixed values are encoded to integers via that encoder.  Otherwise the
+        categorical columns must already be integer-encodable.
 
         Args:
-            X: Input data to check
+            X: Full input array whose first column is text and whose remaining
+               columns are categorical variables.
+
+        Returns:
+            Integer-encoded categorical array of shape (N, n_cat_features).
 
         Raises:
-            ValueError: If the number of categorical variables does not match
-                        the training configuration
+            ValueError: If the number of categorical features does not match the
+                model configuration, if values exceed vocabulary bounds, or if
+                values cannot be cast to integers and no encoder was provided.
         """
-
         assert self.categorical_var_net is not None
 
-        if X.ndim > 1:
-            num_cat_vars = X.shape[1] - 1
-        else:
-            num_cat_vars = 0
+        num_cat_vars = X.shape[1] - 1 if X.ndim > 1 else 0
 
         if num_cat_vars != self.categorical_var_net.num_categorical_features:
             raise ValueError(
-                f"X must have the same number of categorical variables as the number of embedding layers in the categorical net: ({self.categorical_var_net.num_categorical_features})."
+                f"X must have the same number of categorical variables as the number of "
+                f"embedding layers in the categorical net: ({self.categorical_var_net.num_categorical_features})."
             )
 
-        try:
-            categorical_variables = X[:, 1:].astype(int)
-        except ValueError:
-            logger.error(
-                f"Columns {1} to {X.shape[1] - 1} of X_train must be castable in integer format."
-            )
+        categorical_variables = X[:, 1:].astype(int)
 
-        for j in range(X.shape[1] - 1):
+        for j in range(num_cat_vars):
             max_cat_value = categorical_variables[:, j].max()
             if max_cat_value >= self.categorical_var_net.categorical_vocabulary_sizes[j]:
                 raise ValueError(
-                    f"Categorical variable at index {j} has value {max_cat_value} which exceeds the vocabulary size of {self.categorical_var_net.categorical_vocabulary_sizes[j]}."
+                    f"Categorical variable at index {j} has value {max_cat_value} which exceeds "
+                    f"the vocabulary size of {self.categorical_var_net.categorical_vocabulary_sizes[j]}."
                 )
 
         return categorical_variables
 
-    def _check_X(self, X: np.ndarray) -> np.ndarray:
+    def _check_X(self, X: np.ndarray) -> Dict[str, Any]:
         text = self._check_text_col(X)
 
         categorical_variables = None
@@ -657,6 +686,7 @@ class torchTextClassifiers:
             "num_classes": self.num_classes,
             "checkpoint_path": str(checkpoint_path) if checkpoint_path else None,
             "device": str(self.device) if hasattr(self, "device") else None,
+            "has_categorical_encoder": self.categorical_encoder is not None,
         }
 
         # Save metadata
@@ -667,6 +697,11 @@ class torchTextClassifiers:
         tokenizer_path = path / "tokenizer.pkl"
         with open(tokenizer_path, "wb") as f:
             pickle.dump(self.tokenizer, f)
+
+        # Save categorical encoder if present
+        if self.categorical_encoder is not None:
+            with open(path / "categorical_encoder.pkl", "wb") as f:
+                pickle.dump(self.categorical_encoder, f)
 
         logger.info(f"Model saved successfully to {path}")
 
@@ -701,11 +736,20 @@ class torchTextClassifiers:
         # Reconstruct model_config
         model_config = ModelConfig.from_dict(metadata["model_config"])
 
+        # Load categorical encoder if one was saved
+        categorical_encoder = None
+        if metadata.get("has_categorical_encoder"):
+            encoder_path = path / "categorical_encoder.pkl"
+            if encoder_path.exists():
+                with open(encoder_path, "rb") as f:
+                    categorical_encoder = pickle.load(f)
+
         # Create instance
         instance = cls(
             tokenizer=tokenizer,
             model_config=model_config,
             ragged_multilabel=metadata["ragged_multilabel"],
+            categorical_encoder=categorical_encoder,
         )
 
         # Set device

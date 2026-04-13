@@ -1,8 +1,10 @@
 import numpy as np
 import pytest
 import torch
+from sklearn.preprocessing import LabelEncoder
 
 from torchTextClassifiers import ModelConfig, TrainingConfig, torchTextClassifiers
+from torchTextClassifiers.categorical_value_encoder import CategoricalValueEncoder, DictEncoder
 from torchTextClassifiers.dataset import TextClassificationDataset
 from torchTextClassifiers.model import TextClassificationModel, TextClassificationModule
 from torchTextClassifiers.model.components import (
@@ -13,7 +15,13 @@ from torchTextClassifiers.model.components import (
     TextEmbedder,
     TextEmbedderConfig,
 )
-from torchTextClassifiers.tokenizers import HuggingFaceTokenizer, NGramTokenizer, WordPieceTokenizer
+from torchTextClassifiers.tokenizers import NGramTokenizer
+
+try:
+    from torchTextClassifiers.tokenizers import HuggingFaceTokenizer, WordPieceTokenizer
+except ImportError:
+    pass
+
 from torchTextClassifiers.utilities.plot_explainability import (
     map_attributions_to_char,
     map_attributions_to_word,
@@ -33,21 +41,31 @@ def sample_data():
         "Good example here",
         "Bad example here",
     ]
-    categorical_data = np.array([[1, 0], [0, 1], [1, 0], [0, 1], [1, 0], [0, 1]]).astype(int)
-    labels = np.array([1, 0, 1, 0, 1, 5])
+    # String categorical variables — two features, two unique values each
+    categorical_data = np.array(
+        [
+            ["cat", "red"],
+            ["dog", "blue"],
+            ["cat", "red"],
+            ["dog", "blue"],
+            ["cat", "red"],
+            ["dog", "blue"],
+        ]
+    )
+    # String labels
+    labels = np.array(["positive", "negative", "positive", "negative", "positive", "negative"])
 
     return sample_text_data, categorical_data, labels
 
 
 @pytest.fixture
 def model_params():
-    """Fixture providing common model parameters."""
+    """Fixture providing common model parameters (class count and vocab sizes are
+    derived from data at runtime inside run_full_pipeline)."""
     return {
         "embedding_dim": 96,
         "n_layers": 2,
         "n_head": 4,
-        "num_classes": 10,
-        "categorical_vocab_sizes": [2, 2],
         "categorical_embedding_dims": [4, 7],
     }
 
@@ -61,10 +79,28 @@ def run_full_pipeline(
     label_attention_enabled: bool = False,
 ):
     """Helper function to run the complete pipeline for a given tokenizer."""
-    # Create dataset
+
+    # --- Encode categorical variables (string → int) ---
+    n_features = categorical_data.shape[1]
+    encoders = {
+        str(i): DictEncoder(
+            {v: j for j, v in enumerate(sorted(set(categorical_data[:, i].tolist())))}
+        )
+        for i in range(n_features)
+    }
+    cat_encoder = CategoricalValueEncoder(encoders)
+    encoded_categorical = cat_encoder.transform(categorical_data)
+    vocab_sizes = cat_encoder.vocabulary_sizes
+
+    # --- Encode string labels to contiguous integers ---
+    label_encoder = LabelEncoder()
+    encoded_labels = label_encoder.fit_transform(labels)
+    num_classes = len(label_encoder.classes_)
+
+    # --- Direct component test: dataset with already-encoded integers ---
     dataset = TextClassificationDataset(
         texts=sample_text_data,
-        categorical_variables=categorical_data.tolist(),
+        categorical_variables=encoded_categorical.tolist(),
         tokenizer=tokenizer,
         labels=None,
     )
@@ -94,7 +130,7 @@ def run_full_pipeline(
         label_attention_config=(
             LabelAttentionConfig(
                 n_head=attention_config.n_head,
-                num_classes=model_params["num_classes"],
+                num_classes=num_classes,
             )
             if label_attention_enabled
             else None
@@ -104,9 +140,9 @@ def run_full_pipeline(
     text_embedder = TextEmbedder(text_embedder_config=text_embedder_config)
     text_embedder.init_weights()
 
-    # Create categorical variable net
+    # Create categorical variable net (vocab sizes from fitted encoder)
     categorical_var_net = CategoricalVariableNet(
-        categorical_vocabulary_sizes=model_params["categorical_vocab_sizes"],
+        categorical_vocabulary_sizes=vocab_sizes,
         categorical_embedding_dims=model_params["categorical_embedding_dims"],
     )
 
@@ -114,7 +150,7 @@ def run_full_pipeline(
     expected_input_dim = model_params["embedding_dim"] + categorical_var_net.output_dim
     classification_head = ClassificationHead(
         input_dim=expected_input_dim,
-        num_classes=model_params["num_classes"] if not label_attention_enabled else 1,
+        num_classes=num_classes if not label_attention_enabled else 1,
     )
 
     # Create model
@@ -141,34 +177,35 @@ def run_full_pipeline(
     # Test prediction
     module.predict_step(batch)
 
-    # Prepare data for training
+    # --- Wrapper pipeline with string categorical data ---
+    # X keeps categorical columns as raw strings; the wrapper encoder handles them.
     X = np.column_stack([sample_text_data, categorical_data])
-    Y = labels
+    Y = encoded_labels  # integer-encoded labels (from LabelEncoder)
 
-    # Create model config
+    # Create model config (vocab sizes and num_classes come from the encoders)
     model_config = ModelConfig(
         embedding_dim=model_params["embedding_dim"],
-        categorical_vocabulary_sizes=model_params["categorical_vocab_sizes"],
+        categorical_vocabulary_sizes=vocab_sizes,
         categorical_embedding_dims=model_params["categorical_embedding_dims"],
-        num_classes=model_params["num_classes"],
+        num_classes=num_classes,
         attention_config=attention_config,
         n_heads_label_attention=attention_config.n_head,
     )
 
-    # Create training config
     training_config = TrainingConfig(
         lr=1e-3,
         batch_size=4,
         num_epochs=1,
     )
 
-    # Create classifier
+    # Create classifier — pass the fitted categorical encoder
     ttc = torchTextClassifiers(
         tokenizer=tokenizer,
         model_config=model_config,
+        categorical_encoder=cat_encoder,
     )
 
-    # Train
+    # Train with raw string categorical data
     ttc.train(
         X_train=X,
         y_train=Y,
@@ -176,10 +213,11 @@ def run_full_pipeline(
         y_val=Y,
         training_config=training_config,
     )
-    ttc.load(ttc.save_path)  # test load
+    assert ttc.save_path is not None
+    ttc.load(ttc.save_path)  # test load (encoder is also saved/restored)
 
     # Predict with explanations
-    top_k = 5
+    top_k = min(5, num_classes)
 
     predictions = ttc.predict(
         X,
@@ -197,7 +235,7 @@ def run_full_pipeline(
         expected_shape = (
             len(sample_text_data),  # batch_size
             model_params["n_head"],  # n_head
-            model_params["num_classes"],  # num_classes
+            num_classes,  # num_classes (derived from label encoder)
             tokenizer.output_dim,  # seq_len
         )
         assert label_attention_attributions.shape == expected_shape, (
@@ -205,7 +243,6 @@ def run_full_pipeline(
             f"Expected {expected_shape}, got {label_attention_attributions.shape}"
         )
     else:
-        # When label attention is not enabled, the attributions should be None
         assert (
             predictions.get("label_attention_attributions") is None
         ), "Label attention attributions should be None when label_attention_enabled is False"
@@ -220,8 +257,6 @@ def run_full_pipeline(
     words, word_attributions = map_attributions_to_word(attributions, text, word_ids, offsets)
     char_attributions = map_attributions_to_char(attributions, offsets, text)
 
-    # Note: We're not actually plotting in tests, just calling the functions
-    # to ensure they don't raise errors
     plot_attributions_at_char(text, char_attributions)
     plot_attributions_at_word(
         text=text,
@@ -238,11 +273,9 @@ def test_wordpiece_tokenizer(sample_data, model_params):
     tokenizer = WordPieceTokenizer(vocab_size, output_dim=50)
     tokenizer.train(sample_text_data)
 
-    # Check tokenizer works
     result = tokenizer.tokenize(sample_text_data)
     assert result.input_ids.shape[0] == len(sample_text_data)
 
-    # Run full pipeline
     run_full_pipeline(tokenizer, sample_text_data, categorical_data, labels, model_params)
 
 
@@ -254,11 +287,9 @@ def test_huggingface_tokenizer(sample_data, model_params):
         "google-bert/bert-base-uncased", output_dim=50
     )
 
-    # Check tokenizer works
     result = tokenizer.tokenize(sample_text_data)
     assert result.input_ids.shape[0] == len(sample_text_data)
 
-    # Run full pipeline
     run_full_pipeline(tokenizer, sample_text_data, categorical_data, labels, model_params)
 
 
@@ -271,18 +302,15 @@ def test_ngram_tokenizer(sample_data, model_params):
     )
     tokenizer.train(sample_text_data)
 
-    # Check tokenizer works
     result = tokenizer.tokenize(
         sample_text_data[0], return_offsets_mapping=True, return_word_ids=True
     )
     assert result.input_ids is not None
 
-    # Check batch decode
     batch_result = tokenizer.tokenize(sample_text_data)
     decoded = tokenizer.batch_decode(batch_result.input_ids.tolist())
     assert len(decoded) == len(sample_text_data)
 
-    # Run full pipeline
     run_full_pipeline(tokenizer, sample_text_data, categorical_data, labels, model_params)
 
 
@@ -294,11 +322,9 @@ def test_label_attention_enabled(sample_data, model_params):
     tokenizer = WordPieceTokenizer(vocab_size, output_dim=50)
     tokenizer.train(sample_text_data)
 
-    # Check tokenizer works
     result = tokenizer.tokenize(sample_text_data)
     assert result.input_ids.shape[0] == len(sample_text_data)
 
-    # Run full pipeline with label attention enabled
     run_full_pipeline(
         tokenizer,
         sample_text_data,
