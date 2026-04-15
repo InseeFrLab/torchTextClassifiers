@@ -90,7 +90,7 @@ class TextClassificationDataset(Dataset):
                     padding_value=-1,  # use impossible class
                 ).int()
 
-                labels_tensor = torch.zeros(labels_padded.size(0), 6).float()
+                labels_tensor = torch.zeros(labels_padded.size(0), self.num_classes).float()
                 mask = labels_padded != -1
 
                 batch_size = labels_padded.size(0)
