@@ -1,3 +1,5 @@
+from typing import Optional
+
 import numpy as np
 from sklearn.preprocessing import LabelEncoder
 
@@ -25,44 +27,71 @@ class DictEncoder:
         else:
             raise TypeError("Unsupported type for encoding: {}".format(type(col)))
 
+    @property
+    def vocabulary_size(self):
+        return len(self.mapping)
 
-class CategoricalValueEncoder:
+
+class ValueEncoder:
     """
     An object to encode raw categorical values into numerical indices.
-
-    Initialized with pre-built DictEncoder or sklearn LabelEncoder instances,
-    one per categorical feature.
 
     Build encoders externally before passing them in:
     - DictEncoder: provide a ``{value: index}`` mapping directly.
     - sklearn LabelEncoder: call ``LabelEncoder().fit(column)`` per feature.
 
     Initialization:
-    - encoders: A dictionary mapping feature names to DictEncoder or LabelEncoder instances.
+    - label_encoder: A DictEncoder or LabelEncoder instance for encoding labels.
+    - encoders (optional): A dictionary mapping feature names to DictEncoder or LabelEncoder instances.
 
     Properties:
     - vocabulary_sizes: List of vocabulary sizes (number of unique values) for each feature.
+    - num_classes: Number of unique classes in the label encoder.
 
     Usage:
     - transform(array): Encode a 2D array of shape (N, n_features) to integers.
     - __call__(array): Alias for transform.
     """
 
-    def __init__(self, encoders: dict[str, DictEncoder | LabelEncoder]):
-        self.encoders = encoders
+    def __init__(
+        self,
+        label_encoder: DictEncoder | LabelEncoder,
+        categorical_encoders: Optional[dict[str, DictEncoder | LabelEncoder]] = None,
+    ):
+        self.categorical_encoders = categorical_encoders
+
+        if not isinstance(label_encoder, (DictEncoder, LabelEncoder)):
+            raise TypeError(
+                f"label_encoder must be a DictEncoder or LabelEncoder instance, got {type(label_encoder)}"
+            )
+        self.label_encoder = label_encoder
 
     @property
     def vocabulary_sizes(self) -> list[int]:
         """Number of unique categories per feature, in order."""
-        sizes = []
-        for enc in self.encoders.values():
-            if isinstance(enc, DictEncoder):
-                sizes.append(len(enc.mapping))
-            elif hasattr(enc, "classes_"):
-                sizes.append(len(enc.classes_))
-            else:
-                raise TypeError(f"Unsupported encoder type: {type(enc)}")
-        return sizes
+
+        if self.categorical_encoders is None:
+            return None
+        else:
+            sizes = []
+            for enc in self.categorical_encoders.values():
+                if isinstance(enc, DictEncoder):
+                    sizes.append(len(enc.mapping))
+                elif hasattr(enc, "classes_"):
+                    sizes.append(len(enc.classes_))
+                else:
+                    raise TypeError(f"Unsupported encoder type: {type(enc)}")
+            return sizes
+
+    @property
+    def num_classes(self) -> int:
+        """Number of unique classes in the label encoder, if provided."""
+        if isinstance(self.label_encoder, DictEncoder):
+            return len(self.label_encoder.mapping)
+        elif hasattr(self.label_encoder, "classes_"):
+            return len(self.label_encoder.classes_)
+        else:
+            raise TypeError(f"Unsupported label encoder type: {type(self.label_encoder)}")
 
     def transform(self, X_categorical: np.ndarray) -> np.ndarray:
         """Encode all categorical columns to integer indices.
@@ -78,11 +107,15 @@ class CategoricalValueEncoder:
         Raises:
             ValueError: If any value was not seen during fitting.
         """
+
+        if self.categorical_encoders is None:
+            raise ValueError("No categorical encoders provided. Cannot transform data.")
+
         if X_categorical.ndim == 1:
             X_categorical = X_categorical.reshape(-1, 1)
 
         result = np.empty(X_categorical.shape, dtype=np.int64)
-        for idx, (name, encoder) in enumerate(self.encoders.items()):
+        for idx, (name, encoder) in enumerate(self.categorical_encoders.items()):
             col = X_categorical[:, idx].astype(str)
             encoded = encoder.transform(col)
             try:
@@ -95,6 +128,30 @@ class CategoricalValueEncoder:
                 )
 
         return result
+
+    def transform_labels(self, y_labels: np.ndarray) -> np.ndarray:
+        """Encode label array to integer indices.
+
+        Values are converted to strings before lookup. Unknown values raise a ValueError.
+
+        Args:
+            y_labels: Array of shape (N,) with label values.
+        Returns:
+            Integer-encoded array of shape (N,), dtype int64.
+        Raises:
+            ValueError: If any label value was not seen during fitting.
+        """
+
+        col = y_labels.astype(str)
+        encoded = self.label_encoder.transform(col)
+        try:
+            return encoded.astype(np.int64)
+        except (TypeError, ValueError):
+            unknown = [v for v, e in zip(col.tolist(), encoded.tolist()) if e is None]
+            raise ValueError(
+                f"Unknown values in label encoder: {unknown}. "
+                "These values were not seen during fitting."
+            )
 
     def __call__(self, array: np.ndarray) -> np.ndarray:
         return self.transform(array)
