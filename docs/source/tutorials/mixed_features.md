@@ -7,6 +7,7 @@ Learn how to combine text with categorical variables for improved classification
 By the end of this tutorial, you'll be able to:
 
 - Combine text and categorical features in a single model
+- Use `ValueEncoder` to handle raw string inputs without manual integer encoding
 - Configure categorical embeddings
 - Compare performance with and without categorical features
 - Understand when categorical features improve results
@@ -38,7 +39,11 @@ These features can significantly improve classification when they contain releva
 - Random or high-cardinality features (e.g., user IDs)
 - Categorical features with no relationship to labels
 
-## Complete Example
+## Complete Example (with ValueEncoder — recommended)
+
+`ValueEncoder` lets you pass raw string values for both categorical features and labels.
+No manual integer encoding is needed before training: the wrapper applies the encoders
+automatically and decodes labels back to their original values after prediction.
 
 ```python
 import numpy as np
@@ -47,8 +52,9 @@ from sklearn.model_selection import train_test_split
 
 from torchTextClassifiers import ModelConfig, TrainingConfig, torchTextClassifiers
 from torchTextClassifiers.tokenizers import WordPieceTokenizer
+from torchTextClassifiers.value_encoder import DictEncoder, ValueEncoder
 
-# Sample data: Product reviews with category
+# Sample data: Product reviews with category (raw string values)
 texts = [
     "Great phone with excellent camera",
     "Battery dies too quickly",
@@ -60,62 +66,122 @@ texts = [
     "Product arrived damaged"
 ]
 
-# Categorical feature: Product category (0=Electronics, 1=Audio)
-categories = [0, 0, 0, 0, 1, 1, 0, 0]
+categories = ["Electronics", "Electronics", "Electronics", "Electronics",
+              "Audio", "Audio", "Electronics", "Electronics"]
+labels = np.array(["positive", "negative", "positive", "negative",
+                   "positive", "negative", "positive", "negative"])
 
-# Labels: Positive (1) or Negative (0)
-labels = [1, 0, 1, 0, 1, 0, 1, 0]
+# Combine text and raw categorical into one array
+X = np.column_stack([texts, categories])
 
-# Prepare data
-X_text = np.array(texts)
-X_categorical = np.array(categories).reshape(-1, 1)  # Shape: (n_samples, 1)
-y = np.array(labels)
+X_train, X_test, y_train, y_test = train_test_split(X, labels, test_size=0.25, random_state=42)
 
-# Split data
-X_text_train, X_text_test, X_cat_train, X_cat_test, y_train, y_test = train_test_split(
-    X_text, X_categorical, y, test_size=0.25, random_state=42
+# --- Build encoders (fit on train data only) ---
+cat_encoder = LabelEncoder().fit(X_train[:, 1])      # for the category column
+label_encoder = LabelEncoder().fit(y_train)          # for labels
+
+value_encoder = ValueEncoder(
+    label_encoder=label_encoder,
+    categorical_encoders={"category": cat_encoder},  # one entry per categorical column
 )
 
 # Create tokenizer
 tokenizer = WordPieceTokenizer(vocab_size=1000)
-tokenizer.train(X_text_train.tolist())
+tokenizer.train(X_train[:, 0].tolist())
 
-# Configure model WITH categorical features
+# The ValueEncoder exposes vocabulary sizes and num_classes automatically
 model_config = ModelConfig(
     embedding_dim=64,
-    num_classes=2,
-    categorical_vocabulary_sizes=[2],  # 2 categories (Electronics, Audio)
-    categorical_embedding_dims=[8],     # Embed each category into 8 dimensions
+    categorical_embedding_dims=[8],
+    # num_classes and categorical_vocabulary_sizes are inferred from the ValueEncoder
 )
 
-# Create classifier
 classifier = torchTextClassifiers(
     tokenizer=tokenizer,
-    model_config=model_config
+    model_config=model_config,
+    value_encoder=value_encoder,   # <-- pass the encoder here
 )
 
-# Training configuration
 training_config = TrainingConfig(
     num_epochs=20,
     batch_size=4,
-    lr=1e-3
+    lr=1e-3,
+    # raw_categorical_inputs=True (default) — the wrapper encodes for you
+    # raw_labels=True (default) — labels are encoded automatically
 )
 
-# Combine text and categorical features
+classifier.train(X_train, y_train, training_config=training_config)
+
+# Predict — predictions are decoded back to original label strings
+result = classifier.predict(X_test)
+print(result["prediction"])   # e.g. ["positive", "negative", ...]
+```
+
+## Complete Example (manual encoding)
+
+If you prefer to handle integer encoding yourself, omit the `ValueEncoder` and pass
+already-encoded arrays. In this case you must set `raw_categorical_inputs=False` and
+`raw_labels=False` in `TrainingConfig` and in `predict`.
+
+```python
+import numpy as np
+from sklearn.preprocessing import LabelEncoder
+from sklearn.model_selection import train_test_split
+
+from torchTextClassifiers import ModelConfig, TrainingConfig, torchTextClassifiers
+from torchTextClassifiers.tokenizers import WordPieceTokenizer
+
+texts = [
+    "Great phone with excellent camera",
+    "Battery dies too quickly",
+    "Love this laptop's performance",
+    "Screen quality is poor",
+    "Best headphones I've ever owned",
+    "Sound quality is disappointing",
+    "Fast shipping and great quality",
+    "Product arrived damaged"
+]
+
+# Categorical feature already encoded as integers (0=Electronics, 1=Audio)
+categories = [0, 0, 0, 0, 1, 1, 0, 0]
+labels = [1, 0, 1, 0, 1, 0, 1, 0]
+
+X_text = np.array(texts)
+X_categorical = np.array(categories).reshape(-1, 1)
+y = np.array(labels)
+
+X_text_train, X_text_test, X_cat_train, X_cat_test, y_train, y_test = train_test_split(
+    X_text, X_categorical, y, test_size=0.25, random_state=42
+)
+
+tokenizer = WordPieceTokenizer(vocab_size=1000)
+tokenizer.train(X_text_train.tolist())
+
+model_config = ModelConfig(
+    embedding_dim=64,
+    num_classes=2,
+    categorical_vocabulary_sizes=[2],
+    categorical_embedding_dims=[8],
+)
+
+classifier = torchTextClassifiers(tokenizer=tokenizer, model_config=model_config)
+
+training_config = TrainingConfig(
+    num_epochs=20,
+    batch_size=4,
+    lr=1e-3,
+    raw_categorical_inputs=False,   # inputs are already integer-encoded
+    raw_labels=False,               # labels are already integer-encoded
+)
+
 X_train_mixed = np.column_stack([X_text_train, X_cat_train])
 X_test_mixed = np.column_stack([X_text_test, X_cat_test])
 
-# Train model
-classifier.train(
-    X_train_mixed, y_train,
-    training_config=training_config
-)
+classifier.train(X_train_mixed, y_train, training_config=training_config)
 
-# Predict
-result = classifier.predict(X_test_mixed)
+result = classifier.predict(X_test_mixed, raw_categorical_inputs=False)
 predictions = result["prediction"].squeeze().numpy()
 
-# Evaluate
 accuracy = (predictions == y_test).mean()
 print(f"Test Accuracy: {accuracy:.3f}")
 ```
@@ -124,12 +190,41 @@ print(f"Test Accuracy: {accuracy:.3f}")
 
 ### 1. Prepare Categorical Features
 
-Categorical features must be **encoded as integers** (0, 1, 2, ...):
+#### With ValueEncoder (recommended)
+
+`ValueEncoder` handles raw string inputs directly.
+Build one encoder per categorical column (fit on training data only), then wrap them:
+
+```python
+from sklearn.preprocessing import LabelEncoder
+from torchTextClassifiers.value_encoder import DictEncoder, ValueEncoder
+
+# Example: one string column
+cat_encoder = LabelEncoder().fit(X_train_categories)
+
+# Example: explicit mapping with DictEncoder
+cat_encoder = DictEncoder({"Electronics": 0, "Audio": 1})
+
+value_encoder = ValueEncoder(
+    label_encoder=LabelEncoder().fit(y_train),
+    categorical_encoders={"category": cat_encoder},   # key = feature name (any string)
+)
+
+# Stack text + raw string categories — no integer conversion needed
+X_train = np.column_stack([texts_train, categories_train])  # dtype=object is fine
+```
+
+The `ValueEncoder` also exposes `.vocabulary_sizes` and `.num_classes` so you don't
+have to compute them manually for `ModelConfig`.
+
+#### Without ValueEncoder (manual encoding)
+
+If you prefer to manage encoding yourself, categorical features must be
+**encoded as integers** (0, 1, 2, ...) before being passed to the model:
 
 ```python
 from sklearn.preprocessing import LabelEncoder
 
-# Example: Encode product categories
 categories = ["Electronics", "Audio", "Electronics", "Audio"]
 encoder = LabelEncoder()
 categories_encoded = encoder.fit_transform(categories)
@@ -353,12 +448,25 @@ X_categorical = categories.reshape(-1, 1)  # Add column dimension
 
 ### Issue 2: Non-Integer Categories
 
-**Error:** "Expected integer values"
+**Error:** "Expected integer values" or "Raw categorical input encoding is enabled, but no value_encoder was provided"
 
-**Solution:** Use `LabelEncoder`:
+**Solution (recommended):** Use a `ValueEncoder` so the wrapper handles encoding automatically:
+```python
+from torchTextClassifiers.value_encoder import ValueEncoder
+from sklearn.preprocessing import LabelEncoder
+
+value_encoder = ValueEncoder(
+    label_encoder=LabelEncoder().fit(y_train),
+    categorical_encoders={"category": LabelEncoder().fit(X_train_categories)},
+)
+classifier = torchTextClassifiers(..., value_encoder=value_encoder)
+```
+
+**Alternative:** encode manually and set `raw_categorical_inputs=False`:
 ```python
 encoder = LabelEncoder()
 categories_encoded = encoder.fit_transform(categories)
+training_config = TrainingConfig(..., raw_categorical_inputs=False, raw_labels=False)
 ```
 
 ### Issue 3: Missing Vocabulary Sizes
