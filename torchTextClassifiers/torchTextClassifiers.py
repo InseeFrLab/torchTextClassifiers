@@ -22,7 +22,6 @@ from pytorch_lightning.callbacks import (
     ModelCheckpoint,
 )
 
-from torchTextClassifiers.categorical_value_encoder import ValueEncoder
 from torchTextClassifiers.dataset import TextClassificationDataset
 from torchTextClassifiers.model import TextClassificationModel, TextClassificationModule
 from torchTextClassifiers.model.components import (
@@ -35,6 +34,7 @@ from torchTextClassifiers.model.components import (
     TextEmbedderConfig,
 )
 from torchTextClassifiers.tokenizers import BaseTokenizer, TokenizerOutput
+from torchTextClassifiers.value_encoder import ValueEncoder
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +125,7 @@ class torchTextClassifiers:
 
         Example:
             >>> from torchTextClassifiers import ModelConfig, TrainingConfig, torchTextClassifiers
-            >>> from torchTextClassifiers.categorical_value_encoder import ValueEncoder, DictEncoder
+            >>> from torchTextClassifiers.value_encoder import ValueEncoder, DictEncoder
             >>> # Build one DictEncoder per categorical feature
             >>> encoders = {str(i): DictEncoder({v: j for j, v in enumerate(sorted(set(X_categorical[:, i])))})
             ...             for i in range(X_categorical.shape[1])}
@@ -492,9 +492,9 @@ class torchTextClassifiers:
                 raise ValueError(
                     "Raw categorical input encoding is enabled, but no value_encoder was provided. Please provide a ValueEncoder to encode raw categorical values to integers."
                 )
-            X[:, 1:] = self.value_encoder.transform(X[:, 1:])
-
-        categorical_variables = X[:, 1:].astype(int)
+            categorical_variables = self.value_encoder.transform(X[:, 1:]).astype(int)
+        else:
+            categorical_variables = X[:, 1:].astype(int)
 
         for j in range(num_cat_vars):
             max_cat_value = categorical_variables[:, j].max()
@@ -549,6 +549,7 @@ class torchTextClassifiers:
     def predict(
         self,
         X_test: np.ndarray,
+        raw_categorical_inputs: bool = True,
         top_k=1,
         explain_with_label_attention: bool = False,
         explain_with_captum=False,
@@ -593,7 +594,7 @@ class torchTextClassifiers:
             return_offsets_mapping = False
             return_word_ids = False
 
-        X_test = self._check_X(X_test)
+        X_test = self._check_X(X_test, raw_categorical_inputs)
         text = X_test["text"]
         categorical_variables = X_test["categorical_variables"]
 
@@ -638,7 +639,12 @@ class torchTextClassifiers:
 
         label_scores_topk = torch.topk(label_scores, k=top_k, dim=1)
 
-        predictions = label_scores_topk.indices  # get the top_k most likely predictions
+        integer_predictions = label_scores_topk.indices  # integer class indices (needed for captum)
+        if self.value_encoder is not None:
+            predictions = self.value_encoder.inverse_transform_labels(integer_predictions.numpy())
+        else:
+            predictions = integer_predictions
+
         confidence = torch.round(label_scores_topk.values, decimals=2)  # and their scores
 
         if explain:
@@ -648,7 +654,7 @@ class torchTextClassifiers:
                 for k in range(top_k):
                     attributions = lig.attribute(
                         (encoded_text, attention_mask, categorical_vars),
-                        target=torch.Tensor(predictions[:, k]).long(),
+                        target=integer_predictions[:, k],
                     )  # (batch_size, seq_len)
                     attributions = attributions.sum(dim=-1)
                     captum_attributions.append(attributions.detach().cpu())
