@@ -4,7 +4,6 @@ import torch
 from sklearn.preprocessing import LabelEncoder
 
 from torchTextClassifiers import ModelConfig, TrainingConfig, torchTextClassifiers
-from torchTextClassifiers.categorical_value_encoder import CategoricalValueEncoder, DictEncoder
 from torchTextClassifiers.dataset import TextClassificationDataset
 from torchTextClassifiers.model import TextClassificationModel, TextClassificationModule
 from torchTextClassifiers.model.components import (
@@ -16,6 +15,7 @@ from torchTextClassifiers.model.components import (
     TextEmbedderConfig,
 )
 from torchTextClassifiers.tokenizers import NGramTokenizer
+from torchTextClassifiers.value_encoder import DictEncoder, ValueEncoder
 
 try:
     from torchTextClassifiers.tokenizers import HuggingFaceTokenizer, WordPieceTokenizer
@@ -88,14 +88,15 @@ def run_full_pipeline(
         )
         for i in range(n_features)
     }
-    cat_encoder = CategoricalValueEncoder(encoders)
-    encoded_categorical = cat_encoder.transform(categorical_data)
-    vocab_sizes = cat_encoder.vocabulary_sizes
 
     # --- Encode string labels to contiguous integers ---
     label_encoder = LabelEncoder()
-    encoded_labels = label_encoder.fit_transform(labels)
+    label_encoder.fit(labels)
     num_classes = len(label_encoder.classes_)
+
+    value_encoder = ValueEncoder(label_encoder, encoders)
+    encoded_categorical = value_encoder.transform(categorical_data)
+    vocab_sizes = value_encoder.vocabulary_sizes
 
     # --- Direct component test: dataset with already-encoded integers ---
     dataset = TextClassificationDataset(
@@ -180,7 +181,7 @@ def run_full_pipeline(
     # --- Wrapper pipeline with string categorical data ---
     # X keeps categorical columns as raw strings; the wrapper encoder handles them.
     X = np.column_stack([sample_text_data, categorical_data])
-    Y = encoded_labels  # integer-encoded labels (from LabelEncoder)
+    Y = labels  # raw string labels (encoded by value_encoder)
 
     # Create model config (vocab sizes and num_classes come from the encoders)
     model_config = ModelConfig(
@@ -198,11 +199,11 @@ def run_full_pipeline(
         num_epochs=1,
     )
 
-    # Create classifier — pass the fitted categorical encoder
+    # Create classifier — pass the fitted value encoder
     ttc = torchTextClassifiers(
         tokenizer=tokenizer,
         model_config=model_config,
-        categorical_encoder=cat_encoder,
+        value_encoder=value_encoder,
     )
 
     # Train with raw string categorical data
