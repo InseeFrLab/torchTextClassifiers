@@ -42,7 +42,8 @@ class ValueEncoder:
 
     Initialization:
     - label_encoder: A DictEncoder or LabelEncoder instance for encoding labels.
-    - encoders (optional): A dictionary mapping feature names to DictEncoder or LabelEncoder instances.
+    - encoders (optional): A dictionary mapping feature names to DictEncoder or
+      LabelEncoder instances.
 
     Properties:
     - vocabulary_sizes: List of vocabulary sizes (number of unique values) for each feature.
@@ -62,7 +63,8 @@ class ValueEncoder:
 
         if not isinstance(label_encoder, (DictEncoder, LabelEncoder)):
             raise TypeError(
-                f"label_encoder must be a DictEncoder or LabelEncoder instance, got {type(label_encoder)}"
+                "label_encoder must be a DictEncoder or LabelEncoder instance, "
+                f"got {type(label_encoder)}"
             )
         self.label_encoder = label_encoder
 
@@ -152,6 +154,27 @@ class ValueEncoder:
                 f"Unknown values in label encoder: {unknown}. "
                 "These values were not seen during fitting."
             )
+
+    def inverse_transform_labels(self, y_encoded: np.ndarray) -> np.ndarray:
+        """Decode integer-encoded labels back to original values.
+
+        Args:
+            y_encoded: Array of shape (N,) with integer-encoded labels.
+        Returns:
+            Array of shape (N,) with original label values.
+        Raises:
+            ValueError: If any encoded label value was not seen during fitting.
+        """
+
+        if isinstance(self.label_encoder, DictEncoder):
+            inverse_mapping = self.label_encoder.inverse_mapping
+            return np.vectorize(inverse_mapping.get)(y_encoded)
+        elif hasattr(self.label_encoder, "inverse_transform"):
+            shape = y_encoded.shape
+            result = self.label_encoder.inverse_transform(y_encoded.ravel())
+            return result.reshape(shape) if len(shape) > 1 else result
+        else:
+            raise TypeError(f"Unsupported label encoder type: {type(self.label_encoder)}")
 
     def __call__(self, array: np.ndarray) -> np.ndarray:
         return self.transform(array)
