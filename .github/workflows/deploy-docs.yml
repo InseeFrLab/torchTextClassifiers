@@ -59,7 +59,7 @@ jobs:
         cp -r notebooks/_site/* final_site/notebooks/
 
     - name: Upload artifact
-      uses: actions/upload-pages-artifact@v4
+      uses: actions/upload-pages-artifact@v5
       with:
         path: final_site
 
