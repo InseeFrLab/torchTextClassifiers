@@ -30,8 +30,10 @@ from torchTextClassifiers.model.components import (
     CategoricalVariableNet,
     ClassificationHead,
     LabelAttentionConfig,
-    TextEmbedder,
-    TextEmbedderConfig,
+    TokenEmbedder,
+    TokenEmbedderConfig,
+    SentenceEmbedder,
+    SentenceEmbedderConfig
 )
 from torchTextClassifiers.tokenizers import BaseTokenizer, TokenizerOutput
 from torchTextClassifiers.value_encoder import ValueEncoder
@@ -56,6 +58,7 @@ class ModelConfig:
     categorical_embedding_dims: Optional[Union[List[int], int]] = None
     attention_config: Optional[AttentionConfig] = None
     n_heads_label_attention: Optional[int] = None
+    aggregation_method: Optional[str] = "mean"
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -183,20 +186,27 @@ class torchTextClassifiers:
             )
             self.embedding_dim = self.tokenizer.output_dim
         else:
-            text_embedder_config = TextEmbedderConfig(
+            token_embedder_config = TokenEmbedderConfig(
                 vocab_size=self.vocab_size,
                 embedding_dim=self.embedding_dim,
                 padding_idx=tokenizer.padding_idx,
                 attention_config=model_config.attention_config,
-                label_attention_config=LabelAttentionConfig(
-                    n_head=model_config.n_heads_label_attention,
-                    num_classes=model_config.num_classes,
-                )
-                if self.enable_label_attention
-                else None,
             )
-            self.text_embedder = TextEmbedder(
-                text_embedder_config=text_embedder_config,
+            sentence_embedder_config = SentenceEmbedderConfig(
+                label_attention_config = LabelAttentionConfig(
+                        n_head=model_config.n_heads_label_attention,
+                        num_classes=model_config.num_classes,
+                        embedding_dim=self.embedding_dim
+                    )
+                    if self.enable_label_attention
+                    else None,
+                aggregation_method=model_config.aggregation_method
+            )
+            self.token_embedder = TokenEmbedder(
+                token_embedder_config=token_embedder_config,
+            )
+            self.sentence_embedder = SentenceEmbedder(
+                sentence_embedder_config=sentence_embedder_config
             )
 
         classif_head_input_dim = self.embedding_dim
@@ -221,7 +231,8 @@ class torchTextClassifiers:
         )
 
         self.pytorch_model = TextClassificationModel(
-            text_embedder=self.text_embedder,
+            token_embedder=self.token_embedder,
+            sentence_embedder=self.sentence_embedder,
             categorical_variable_net=self.categorical_var_net,
             classification_head=self.classification_head,
         )

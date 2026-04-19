@@ -1,3 +1,4 @@
+import logging
 import math
 from dataclasses import dataclass
 from typing import Dict, Optional
@@ -8,47 +9,55 @@ from torch.nn import functional as F
 
 from torchTextClassifiers.model.components.attention import AttentionConfig, Block, norm
 
+logger = logging.getLogger(__name__)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    handlers=[logging.StreamHandler()],
+)
+
 
 @dataclass
 class LabelAttentionConfig:
     n_head: int
     num_classes: int
+    embedding_dim: int
 
 
 @dataclass
-class TextEmbedderConfig:
+class TokenEmbedderConfig:
     vocab_size: int
     embedding_dim: int
     padding_idx: int
     attention_config: Optional[AttentionConfig] = None
+
+
+@dataclass
+class SentenceEmbedderConfig:
+    aggregation_method: Optional[str] = "mean"  # or 'last', or 'first'
     label_attention_config: Optional[LabelAttentionConfig] = None
 
 
-class TextEmbedder(nn.Module):
-    def __init__(self, text_embedder_config: TextEmbedderConfig):
+class TokenEmbedder(nn.Module):
+    """
+    A module that takes tokenized text and outputs dense vector representations (one for each token).
+
+    """
+
+    def __init__(self, token_embedder_config: TokenEmbedderConfig):
         super().__init__()
 
-        self.config = text_embedder_config
+        self.config = token_embedder_config
 
-        self.attention_config = text_embedder_config.attention_config
+        self.attention_config = token_embedder_config.attention_config
         if isinstance(self.attention_config, dict):
             self.attention_config = AttentionConfig(**self.attention_config)
 
-        # Normalize label_attention_config: allow dicts and convert them to LabelAttentionConfig
-        self.label_attention_config = text_embedder_config.label_attention_config
-        if isinstance(self.label_attention_config, dict):
-            self.label_attention_config = LabelAttentionConfig(**self.label_attention_config)
-            # Keep self.config in sync so downstream components (e.g., LabelAttentionClassifier)
-            # always see a LabelAttentionConfig instance rather than a raw dict.
-            self.config.label_attention_config = self.label_attention_config
-
-        self.enable_label_attention = self.label_attention_config is not None
-        if self.enable_label_attention:
-            self.label_attention_module = LabelAttentionClassifier(self.config)
-
-        self.vocab_size = text_embedder_config.vocab_size
-        self.embedding_dim = text_embedder_config.embedding_dim
-        self.padding_idx = text_embedder_config.padding_idx
+        self.vocab_size = token_embedder_config.vocab_size
+        self.embedding_dim = token_embedder_config.embedding_dim
+        self.padding_idx = token_embedder_config.padding_idx
 
         self.embedding_layer = nn.Embedding(
             embedding_dim=self.embedding_dim,
@@ -57,7 +66,7 @@ class TextEmbedder(nn.Module):
         )
 
         if self.attention_config is not None:
-            self.attention_config.n_embd = text_embedder_config.embedding_dim
+            self.attention_config.n_embd: int = token_embedder_config.embedding_dim
             self.transformer = nn.ModuleDict(
                 {
                     "h": nn.ModuleList(
@@ -127,30 +136,7 @@ class TextEmbedder(nn.Module):
         self,
         input_ids: torch.Tensor,
         attention_mask: torch.Tensor,
-        return_label_attention_matrix: bool = False,
     ) -> Dict[str, Optional[torch.Tensor]]:
-        """Converts input token IDs to their corresponding embeddings.
-
-        Args:
-            input_ids (torch.Tensor[Long]), shape (batch_size, seq_len): Tokenized
-            attention_mask (torch.Tensor[Long]), shape (batch_size, seq_len): Attention mask indicating non-pad tokens
-            return_label_attention_matrix (bool): Whether to return the label attention matrix.
-
-        Returns:
-            dict: A dictionary with the following keys:
-
-                - "sentence_embedding" (torch.Tensor): Text embeddings of shape
-                  (batch_size, embedding_dim) if ``self.enable_label_attention`` is False,
-                  else (batch_size, num_classes, embedding_dim), where ``num_classes``
-                  is the number of label classes.
-
-                - "label_attention_matrix" (Optional[torch.Tensor]): Label attention
-                  matrix of shape (batch_size, n_head, num_classes, seq_len) if
-                  ``return_label_attention_matrix`` is True and label attention is
-                  enabled, otherwise ``None``. The dimensions correspond to
-                  (batch_size, attention heads, label classes, sequence length).
-        """
-
         encoded_text = input_ids  # clearer name
         if encoded_text.dtype != torch.long:
             encoded_text = encoded_text.to(torch.long)
@@ -181,92 +167,9 @@ class TextEmbedder(nn.Module):
 
             token_embeddings = norm(token_embeddings)
 
-        out = self._get_sentence_embedding(
-            token_embeddings=token_embeddings,
-            attention_mask=attention_mask,
-            return_label_attention_matrix=return_label_attention_matrix,
-        )
-
-        text_embedding = out["sentence_embedding"]
-        label_attention_matrix = out["label_attention_matrix"]
         return {
-            "sentence_embedding": text_embedding,
-            "label_attention_matrix": label_attention_matrix,
-        }
-
-    def _get_sentence_embedding(
-        self,
-        token_embeddings: torch.Tensor,
-        attention_mask: torch.Tensor,
-        return_label_attention_matrix: bool = False,
-    ) -> Dict[str, Optional[torch.Tensor]]:
-        """
-        Compute sentence embedding from embedded tokens - "remove" second dimension.
-
-        Args (output from dataset collate_fn):
-            token_embeddings (torch.Tensor[Long]), shape (batch_size, seq_len, embedding_dim): Tokenized + padded text
-            attention_mask (torch.Tensor[Long]), shape (batch_size, seq_len): Attention mask indicating non-pad tokens
-            return_label_attention_matrix (bool): Whether to compute and return the label attention matrix
-        Returns:
-            Dict[str, Optional[torch.Tensor]]: A dictionary containing:
-                - 'sentence_embedding': Sentence embeddings, shape (batch_size, embedding_dim) or (batch_size, n_labels, embedding_dim) if label attention is enabled
-                - 'label_attention_matrix': Attention matrix if label attention is enabled and return_label_attention_matrix is True, otherwise None
-        """
-
-        # average over non-pad token embeddings
-        # attention mask has 1 for non-pad tokens and 0 for pad token positions
-
-        # mask pad-tokens
-
-        if self.attention_config is not None:
-            if self.attention_config.aggregation_method is not None:  # default is "mean"
-                if self.attention_config.aggregation_method == "first":
-                    return {
-                        "sentence_embedding": token_embeddings[:, 0, :],
-                        "label_attention_matrix": None,
-                    }
-                elif self.attention_config.aggregation_method == "last":
-                    lengths = attention_mask.sum(dim=1).clamp(min=1)  # last non-pad token index + 1
-                    return {
-                        "sentence_embedding": token_embeddings[
-                            torch.arange(token_embeddings.size(0)),
-                            lengths - 1,
-                            :,
-                        ],
-                        "label_attention_matrix": None,
-                    }
-                else:
-                    if self.attention_config.aggregation_method != "mean":
-                        raise ValueError(
-                            f"Unknown aggregation method: {self.attention_config.aggregation_method}. Supported methods are 'mean', 'first', 'last'."
-                        )
-
-        assert self.attention_config is None or self.attention_config.aggregation_method == "mean"
-
-        if self.enable_label_attention:
-            label_attention_result = self.label_attention_module(
-                token_embeddings,
-                attention_mask=attention_mask,
-                compute_attention_matrix=return_label_attention_matrix,
-            )
-            sentence_embedding = label_attention_result[
-                "sentence_embedding"
-            ]  # (bs, n_labels, d_embed), so classifier needs to be a (d_embed, 1) matrix
-            label_attention_matrix = label_attention_result["attention_matrix"]
-
-        else:  # sentence embedding = mean of (non-pad) token embeddings
-            mask = attention_mask.unsqueeze(-1).float()  # (batch_size, seq_len, 1)
-            masked_embeddings = token_embeddings * mask  # (batch_size, seq_len, embedding_dim)
-            sentence_embedding = masked_embeddings.sum(dim=1) / mask.sum(dim=1).clamp(
-                min=1.0
-            )  # avoid division by zero
-
-            sentence_embedding = torch.nan_to_num(sentence_embedding, 0.0)
-            label_attention_matrix = None
-
-        return {
-            "sentence_embedding": sentence_embedding,
-            "label_attention_matrix": label_attention_matrix,
+            "token_embeddings": token_embeddings,
+            "attention_mask": attention_mask,
         }
 
     def _precompute_rotary_embeddings(self, seq_len, head_dim, base=10000, device=None):
@@ -291,20 +194,25 @@ class TextEmbedder(nn.Module):
         return cos, sin
 
 
-class LabelAttentionClassifier(nn.Module):
+class LabelAttention(nn.Module):
     """
     A head for aggregating token embeddings into label-specific sentence embeddings using cross-attention mechanism.
     Labels are queries that attend over token embeddings (keys and values) to produce label-specific embeddings.
 
     """
 
-    def __init__(self, config: TextEmbedderConfig):
+    def __init__(self, label_attention_config: LabelAttentionConfig):
         super().__init__()
 
-        label_attention_config = config.label_attention_config
-        self.embedding_dim = config.embedding_dim
+        if label_attention_config is None:
+            raise ValueError(
+                "label_attention_config must be provided to use LabelAttention."
+            )
+
+        self.label_attention_config = label_attention_config
         self.num_classes = label_attention_config.num_classes
         self.n_head = label_attention_config.n_head
+        self.embedding_dim = label_attention_config.embedding_dim
 
         # Validate head configuration
         self.head_dim = self.embedding_dim // self.n_head
@@ -399,3 +307,111 @@ class LabelAttentionClassifier(nn.Module):
             attention_matrix = torch.softmax(attention_scores, dim=-1)
 
         return {"sentence_embedding": y, "attention_matrix": attention_matrix}
+
+
+class SentenceEmbedder(nn.Module):
+    def __init__(self, sentence_embedder_config: SentenceEmbedderConfig):
+
+        """
+        A module to aggregate token embeddings.
+
+        Four modes are possible:
+        - aggregation_method="mean" (default): token embeddings are averaged
+        - aggregation_method="first": sentence embedding is the first token's embedding (commin in BERT-like models ([CLS] token))
+        - aggregation_method="last": sentence embedding is the last token's embedding (commin in GPT-like models)
+        - aggregation_method=None: in that case you need to provide a label attention
+        """
+
+        self.config
+        self.label_attention_config = sentence_embedder_config.label_attention_config
+        self.aggregation_method = sentence_embedder_config.aggregation_method
+
+        if isinstance(self.label_attention_config, dict):
+            self.label_attention_config = LabelAttentionConfig(**self.label_attention_config)
+            # Keep self.sentence_embedder_config in sync so downstream components (e.g., LabelAttentionClassifier)
+            # always see a LabelAttentionConfig instance rather than a raw dict.
+            self.sentence_embedder_config.label_attention_config: LabelAttentionConfig = (
+                self.label_attention_config
+            )
+
+        if self.label_attention_config is not None:
+            self.label_attention_module = LabelAttention(
+                label_attention_config=self.label_attention_config
+            )
+            if self.aggregation_method is not None:
+                logger.info(
+                    "Warning: aggregation_method is ignored when label_attention_config is provided, since label attention produces label-specific sentence embeddings without further aggregation."
+                )
+                self.aggregation_method = None  # override to avoid confusion
+
+        if self.aggregation_method not in (None, "mean", "first", "last"):
+            raise ValueError(
+                f"Unsupported aggregation method: {self.aggregation_method}. Supported methods are None, 'mean', 'first', 'last'."
+            )
+        if self.aggregation_method is None:
+            if self.label_attention_config is None:
+                raise ValueError(
+                    "aggregation_method cannot be None when label_attention_config is not provided, since we need some way to aggregate token embeddings into a sentence embedding. Please specify an aggregation method (e.g., 'mean') or provide a label_attention_config to use label attention for aggregation."
+                )
+
+    def forward(
+        self,
+        token_embeddings: torch.Tensor,
+        attention_mask: torch.Tensor,
+        return_label_attention_matrix: bool = False,
+    ) -> Dict[str, Optional[torch.Tensor]]:
+        """
+        Compute sentence embedding from embedded tokens - "remove" second dimension.
+
+        Args (output from dataset collate_fn):
+            token_embeddings (torch.Tensor[Long]), shape (batch_size, seq_len, embedding_dim): Tokenized + padded text
+            attention_mask (torch.Tensor[Long]), shape (batch_size, seq_len): Attention mask indicating non-pad tokens
+            return_label_attention_matrix (bool): Whether to compute and return the label attention matrix
+        Returns:
+            Dict[str, Optional[torch.Tensor]]: A dictionary containing:
+                - 'sentence_embedding': Sentence embeddings, shape (batch_size, embedding_dim) or (batch_size, n_labels, embedding_dim) if label attention is enabled
+                - 'label_attention_matrix': Attention matrix if label attention is enabled and return_label_attention_matrix is True, otherwise None
+        """
+        if self.aggregation_method is not None:  # default is "mean"
+            if self.aggregation_method == "first":
+                return {
+                    "sentence_embedding": token_embeddings[:, 0, :],
+                    "label_attention_matrix": None,
+                }
+            elif self.aggregation_method == "last":
+                lengths = attention_mask.sum(dim=1).clamp(min=1)  # last non-pad token index + 1
+                return {
+                    "sentence_embedding": token_embeddings[
+                        torch.arange(token_embeddings.size(0)),
+                        lengths - 1,
+                        :,
+                    ],
+                    "label_attention_matrix": None,
+                }
+            else:  # mean
+                mask = attention_mask.unsqueeze(-1).float()  # (batch_size, seq_len, 1)
+                masked_embeddings = token_embeddings * mask  # (batch_size, seq_len, embedding_dim)
+                sentence_embedding = masked_embeddings.sum(dim=1) / mask.sum(dim=1).clamp(
+                    min=1.0
+                )  # avoid division by zero
+
+                sentence_embedding = torch.nan_to_num(sentence_embedding, 0.0)
+                return {
+                    "sentence_embedding": sentence_embedding,
+                    "label_attention_matrix": None,
+                }
+
+        else:
+            label_attention_result = self.label_attention_module(
+                token_embeddings,
+                attention_mask=attention_mask,
+                compute_attention_matrix=return_label_attention_matrix,
+            )
+            sentence_embedding = label_attention_result[
+                "sentence_embedding"
+            ]  # (bs, n_labels, d_embed), so classifier needs to be a (d_embed, 1) matrix
+            label_attention_matrix = label_attention_result["attention_matrix"]
+            return {
+                "sentence_embedding": sentence_embedding,
+                "label_attention_matrix": label_attention_matrix,
+            }
