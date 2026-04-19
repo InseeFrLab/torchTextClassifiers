@@ -35,7 +35,6 @@ class AttentionConfig:
     n_kv_head: int
     sequence_len: Optional[int] = None
     positional_encoding: bool = True
-    aggregation_method: str = "mean"  # or 'last', or 'first'
 
 
 #### Attention Block #####
