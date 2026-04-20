@@ -157,50 +157,53 @@ output = tokenizer(["Hello world!", "Text classification"])
 # output.attention_mask: Attention mask (batch_size, seq_len)
 ```
 
-## Component 2: Text Embedder
+## Component 2: Text Embedding Pipeline (TokenEmbedder + SentenceEmbedder)
 
-**Purpose:** Convert tokens into dense, semantic embeddings that capture meaning.
+**Purpose:** Convert tokens into a single dense vector per sample (or one per class with label attention).
 
-### Basic Text Embedding
+Text embedding is split into two distinct, composable stages:
+
+- **`TokenEmbedder`**: maps each input token to a dense vector, with optional self-attention. Output shape: `(batch, seq_len, embedding_dim)`.
+- **`SentenceEmbedder`**: aggregates per-token vectors into a fixed-size sentence representation. Output shape: `(batch, embedding_dim)`, or `(batch, num_classes, embedding_dim)` when label attention is enabled.
+
+### Stage 1 — TokenEmbedder
 
 ```python
-from torchTextClassifiers.model.components import TextEmbedder, TextEmbedderConfig
+from torchTextClassifiers.model.components import TokenEmbedder, TokenEmbedderConfig
 
-config = TextEmbedderConfig(
+config = TokenEmbedderConfig(
     vocab_size=5000,
     embedding_dim=128,
+    padding_idx=0,
 )
-embedder = TextEmbedder(config)
+token_embedder = TokenEmbedder(config)
 
-# Forward pass
-text_features = embedder(token_ids)  # Shape: (batch_size, 128)
+# Forward pass — returns a dict
+out = token_embedder(input_ids, attention_mask)
+# out["token_embeddings"]: (batch_size, seq_len, 128)
 ```
 
-**How it works:**
-1. Looks up embedding for each token
-2. Averages embeddings across the sequence
-3. Produces a fixed-size vector per sample
-
-### With Self-Attention (Optional)
+#### With Self-Attention (Optional)
 
 Add transformer-style self-attention for better contextual understanding:
 
 ```python
-from torchTextClassifiers.model.components import AttentionConfig
+from torchTextClassifiers.model.components import AttentionConfig, TokenEmbedder, TokenEmbedderConfig
 
 attention_config = AttentionConfig(
-    n_embd=128,
-    n_head=4,      # Number of attention heads
-    n_layer=2,     # Number of transformer blocks
-    dropout=0.1,
+    n_layers=2,
+    n_head=4,
+    n_kv_head=4,
+    positional_encoding=False,
 )
 
-config = TextEmbedderConfig(
+config = TokenEmbedderConfig(
     vocab_size=5000,
     embedding_dim=128,
-    attention_config=attention_config,  # Add attention
+    padding_idx=0,
+    attention_config=attention_config,
 )
-embedder = TextEmbedder(config)
+token_embedder = TokenEmbedder(config)
 ```
 
 **When to use attention:**
@@ -211,12 +214,36 @@ embedder = TextEmbedder(config)
 **Configuration:**
 - `embedding_dim`: Size of embedding vectors (e.g., 64, 128, 256)
 - `n_head`: Number of attention heads (typically 4, 8, or 16)
-- `n_layer`: Depth of transformer (start with 2-3)
+- `n_layers`: Depth of transformer (start with 2-3)
+
+### Stage 2 — SentenceEmbedder
+
+`SentenceEmbedder` collapses the `(batch, seq_len, dim)` token matrix into a sentence vector using one of several aggregation strategies:
+
+```python
+from torchTextClassifiers.model.components import SentenceEmbedder, SentenceEmbedderConfig
+
+# Mean-pooling (default)
+sentence_embedder = SentenceEmbedder(SentenceEmbedderConfig(aggregation_method="mean"))
+
+out = sentence_embedder(token_embeddings, attention_mask)
+# out["sentence_embedding"]: (batch_size, 128)
+```
+
+Available aggregation methods:
+
+| `aggregation_method` | Description |
+|----------------------|-------------|
+| `"mean"` (default) | Masked mean of token embeddings |
+| `"first"` | First token (e.g. `[CLS]` for BERT-style models) |
+| `"last"` | Last non-padding token (GPT-style) |
+| `None` | Use label attention (see below) |
 
 ### With Label Attention (Optional Explainability Layer)
 
-Label attention replaces mean-pooling with a **cross-attention mechanism** where each
-class has a learnable embedding that attends over the token sequence:
+Setting `aggregation_method=None` and providing a `LabelAttentionConfig` replaces
+mean-pooling with a **cross-attention mechanism** where each class has a learnable
+embedding that attends over the token sequence:
 
 ```
 Token embeddings (batch, seq_len, d)
@@ -228,7 +255,7 @@ ClassificationHead  (d → 1)                   ← shared, applied per class
 Logits (batch, num_classes)
 ```
 
-Enable it by setting `n_heads_label_attention` in `ModelConfig`:
+Enable it by setting `n_heads_label_attention` in `ModelConfig` (high-level API):
 
 ```python
 model_config = ModelConfig(
@@ -238,11 +265,28 @@ model_config = ModelConfig(
 )
 ```
 
+Or directly with the low-level components:
+
+```python
+from torchTextClassifiers.model.components import (
+    LabelAttentionConfig, SentenceEmbedder, SentenceEmbedderConfig,
+)
+
+sentence_embedder = SentenceEmbedder(SentenceEmbedderConfig(
+    aggregation_method=None,
+    label_attention_config=LabelAttentionConfig(
+        n_head=4,
+        num_classes=6,
+        embedding_dim=96,
+    ),
+))
+```
+
 **Benefits:**
 - Free explainability at inference time (`explain_with_label_attention=True` in `predict`)
 - The returned attention matrix `(batch, n_head, num_classes, seq_len)` shows which
   tokens each class focuses on
-- Can be combined with self-attention (`attention_config`)
+- Can be combined with self-attention in `TokenEmbedder`
 
 **Constraint:** `embedding_dim` must be divisible by `n_heads_label_attention`.
 
@@ -387,15 +431,25 @@ The framework automatically combines all components:
 
 ```python
 from torchTextClassifiers.model import TextClassificationModel
+from torchTextClassifiers.model.components import (
+    TokenEmbedder, TokenEmbedderConfig,
+    SentenceEmbedder, SentenceEmbedderConfig,
+)
+
+token_embedder = TokenEmbedder(TokenEmbedderConfig(
+    vocab_size=5000, embedding_dim=128, padding_idx=0,
+))
+sentence_embedder = SentenceEmbedder(SentenceEmbedderConfig(aggregation_method="mean"))
 
 model = TextClassificationModel(
-    text_embedder=text_embedder,
+    token_embedder=token_embedder,
+    sentence_embedder=sentence_embedder,
     categorical_variable_net=cat_handler,  # Optional
     classification_head=head,
 )
 
 # Forward pass
-logits = model(token_ids, categorical_data)
+logits = model(input_ids, attention_mask, categorical_data)
 ```
 
 ## Usage Examples
@@ -490,19 +544,28 @@ For maximum flexibility, compose components manually:
 
 ```python
 from torch import nn
-from torchTextClassifiers.model.components import TextEmbedder, ClassificationHead
+from torchTextClassifiers.model.components import (
+    TokenEmbedder, TokenEmbedderConfig,
+    SentenceEmbedder, SentenceEmbedderConfig,
+    ClassificationHead,
+)
 
-# Create custom model
 class CustomClassifier(nn.Module):
     def __init__(self):
         super().__init__()
-        self.text_embedder = TextEmbedder(text_config)
+        self.token_embedder = TokenEmbedder(TokenEmbedderConfig(
+            vocab_size=5000, embedding_dim=128, padding_idx=0,
+        ))
+        self.sentence_embedder = SentenceEmbedder(SentenceEmbedderConfig())
         self.custom_layer = nn.Linear(128, 64)
         self.head = ClassificationHead(64, num_classes)
 
-    def forward(self, input_ids):
-        text_features = self.text_embedder(input_ids)
-        custom_features = self.custom_layer(text_features)
+    def forward(self, input_ids, attention_mask):
+        token_out = self.token_embedder(input_ids, attention_mask)
+        sent_out = self.sentence_embedder(
+            token_out["token_embeddings"], token_out["attention_mask"]
+        )
+        custom_features = self.custom_layer(sent_out["sentence_embedding"])
         return self.head(custom_features)
 ```
 
@@ -544,12 +607,18 @@ All components are standard `torch.nn.Module` objects:
 
 ```python
 # All components work with standard PyTorch
-isinstance(text_embedder, nn.Module)  # True
+isinstance(token_embedder, nn.Module)  # True
+isinstance(sentence_embedder, nn.Module)  # True
 isinstance(cat_handler, nn.Module)  # True
 isinstance(head, nn.Module)  # True
 
 # Use in any PyTorch code
-model = TextClassificationModel(text_embedder, cat_handler, head)
+model = TextClassificationModel(
+    token_embedder=token_embedder,
+    sentence_embedder=sentence_embedder,
+    categorical_variable_net=cat_handler,
+    classification_head=head,
+)
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
 # Standard PyTorch training loop
@@ -597,8 +666,9 @@ Each component is independent and can be used separately:
 # Use just the tokenizer
 tokenizer = NGramTokenizer()
 
-# Use just the embedder
-embedder = TextEmbedder(config)
+# Use just the token embedder or sentence embedder
+token_embedder = TokenEmbedder(TokenEmbedderConfig(...))
+sentence_embedder = SentenceEmbedder(SentenceEmbedderConfig())
 
 # Use just the classifier head
 head = ClassificationHead(input_dim, num_classes)
@@ -610,13 +680,20 @@ Mix and match components for your use case:
 
 ```python
 # Text only
-model = TextClassificationModel(text_embedder, None, head)
+model = TextClassificationModel(
+    token_embedder=token_embedder,
+    sentence_embedder=sentence_embedder,
+    categorical_variable_net=None,
+    classification_head=head,
+)
 
 # Text + categorical
-model = TextClassificationModel(text_embedder, cat_handler, head)
-
-# Custom combination
-model = MyCustomModel(text_embedder, my_layer, head)
+model = TextClassificationModel(
+    token_embedder=token_embedder,
+    sentence_embedder=sentence_embedder,
+    categorical_variable_net=cat_handler,
+    classification_head=head,
+)
 ```
 
 ### Simplicity
@@ -642,18 +719,19 @@ model_config = ModelConfig(
 Easy to add custom components:
 
 ```python
-class MyCustomEmbedder(nn.Module):
+class MyCustomTokenEmbedder(nn.Module):
     def __init__(self):
         super().__init__()
         # Your custom implementation
 
-    def forward(self, input_ids):
-        # Your custom forward pass
-        return embeddings
+    def forward(self, input_ids, attention_mask):
+        # Your custom forward pass — must return a dict with "token_embeddings"
+        return {"token_embeddings": embeddings, "attention_mask": attention_mask}
 
 # Use with existing components
 model = TextClassificationModel(
-    text_embedder=MyCustomEmbedder(),
+    token_embedder=MyCustomTokenEmbedder(),
+    sentence_embedder=SentenceEmbedder(SentenceEmbedderConfig()),
     classification_head=head,
 )
 ```
@@ -696,9 +774,10 @@ torchTextClassifiers provides a **component-based pipeline** for text classifica
 
 0. **ValueEncoder** (optional) → Encodes raw string inputs; decodes predictions back to original labels
 1. **Tokenizer** → Converts text to tokens
-2. **Text Embedder** → Creates semantic embeddings (with optional self-attention and/or label attention)
-3. **Categorical Handler** (optional) → Processes additional categorical features
-4. **Classification Head** → Produces predictions
+2. **TokenEmbedder** → Embeds tokens into dense vectors (with optional self-attention) → `(batch, seq_len, dim)`
+3. **SentenceEmbedder** → Aggregates token vectors into a sentence embedding (mean / first / last / label attention) → `(batch, dim)` or `(batch, num_classes, dim)`
+4. **Categorical Handler** (optional) → Processes additional categorical features
+5. **Classification Head** → Produces predictions
 
 **Key Benefits:**
 - Clear data flow through intuitive components
