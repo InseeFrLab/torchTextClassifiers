@@ -20,11 +20,12 @@ Core PyTorch nn.Module combining all components.
 
    **Architecture:**
 
-   The model combines three main components:
+   The model combines four main components:
 
-   1. **TextEmbedder**: Converts tokens to embeddings
-   2. **CategoricalVariableNet** (optional): Handles categorical features
-   3. **ClassificationHead**: Produces class logits
+   1. **TokenEmbedder**: Maps each token to a dense vector (with optional self-attention)
+   2. **SentenceEmbedder**: Aggregates token vectors into a sentence representation
+   3. **CategoricalVariableNet** (optional): Handles categorical features
+   4. **ClassificationHead**: Produces class logits
 
 Example:
 
@@ -32,37 +33,40 @@ Example:
 
    from torchTextClassifiers.model import TextClassificationModel
    from torchTextClassifiers.model.components import (
-       TextEmbedder, TextEmbedderConfig,
-       CategoricalVariableNet, CategoricalForwardType,
-       ClassificationHead
+       TokenEmbedder, TokenEmbedderConfig,
+       SentenceEmbedder, SentenceEmbedderConfig,
+       CategoricalVariableNet,
+       ClassificationHead,
    )
 
    # Create components
-   text_embedder = TextEmbedder(TextEmbedderConfig(
+   token_embedder = TokenEmbedder(TokenEmbedderConfig(
        vocab_size=5000,
-       embedding_dim=128
+       embedding_dim=128,
+       padding_idx=0,
    ))
+   sentence_embedder = SentenceEmbedder(SentenceEmbedderConfig(aggregation_method="mean"))
 
    cat_net = CategoricalVariableNet(
-       vocabulary_sizes=[10, 20],
-       embedding_dims=[8, 16],
-       forward_type=CategoricalForwardType.AVERAGE_AND_CONCAT
+       categorical_vocabulary_sizes=[10, 20],
+       categorical_embedding_dims=[8, 16],
    )
 
    classification_head = ClassificationHead(
        input_dim=128 + 24,  # text_dim + cat_dim
-       num_classes=5
+       num_classes=5,
    )
 
    # Combine into model
    model = TextClassificationModel(
-       text_embedder=text_embedder,
+       token_embedder=token_embedder,
+       sentence_embedder=sentence_embedder,
        categorical_variable_net=cat_net,
-       classification_head=classification_head
+       classification_head=classification_head,
    )
 
    # Forward pass
-   logits = model(input_ids, categorical_data)
+   logits = model(input_ids, attention_mask, categorical_data)
 
 PyTorch Lightning Module
 -------------------------
