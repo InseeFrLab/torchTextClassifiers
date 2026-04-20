@@ -15,8 +15,8 @@ from torchTextClassifiers.model.components import (
     CategoricalForwardType,
     CategoricalVariableNet,
     ClassificationHead,
+    SentenceEmbedder,
     TokenEmbedder,
-    SentenceEmbedder
 )
 from torchTextClassifiers.model.components.attention import norm
 
@@ -53,20 +53,22 @@ class TextClassificationModel(nn.Module):
             classification_head (ClassificationHead): The classification head module.
             token_embedder (Optional[TextEmbedder]): The text embedding module.
                 If not provided, assumes that input text is already embedded (as tensors) and directly passed to the classification head.
-            sentence_embedder: 
+            sentence_embedder:
             categorical_variable_net (Optional[CategoricalVariableNet]): The categorical variable network module.
                 If not provided, assumes no categorical variables are used.
         """
         super().__init__()
 
         self.token_embedder = token_embedder
+        self.sentence_embedder = sentence_embedder
 
         if self.token_embedder is not None:
             self.token_embedder.init_weights()
             if self.sentence_embedder is None:
-                raise ValueError("You have provided a TokenEmbedder but no SentenceEmbedder: please provide one.")
-            else:
-                self.sentence_embedder = sentence_embedder
+                raise ValueError(
+                    "You have provided a TokenEmbedder but no SentenceEmbedder: please provide one."
+                )
+
         self.categorical_variable_net = categorical_variable_net
         if not self.categorical_variable_net:
             logger.info("🔹 No categorical variable network provided; using only text embeddings.")
@@ -76,7 +78,6 @@ class TextClassificationModel(nn.Module):
         self._validate_component_connections()
 
         torch.nn.init.zeros_(self.classification_head.net.weight)
-            
 
     def _validate_component_connections(self):
         def _check_text_categorical_connection(self, token_embedder, cat_var_net):
@@ -158,7 +159,9 @@ class TextClassificationModel(nn.Module):
                 attention_mask=attention_mask,
             )
             x_token = token_embed_output["token_embeddings"]
-            sentence_embedding_output = self.sentence_embedder(x_token, attention_mask, return_label_attention_matrix=return_label_attention_matrix)
+            sentence_embedding_output = self.sentence_embedder(
+                x_token, attention_mask, return_label_attention_matrix=return_label_attention_matrix
+            )
             x_text = sentence_embedding_output["sentence_embedding"]
             if return_label_attention_matrix:
                 label_attention_matrix = sentence_embedding_output["label_attention_matrix"]
