@@ -30,8 +30,10 @@ from torchTextClassifiers.model.components import (
     CategoricalVariableNet,
     ClassificationHead,
     LabelAttentionConfig,
-    TextEmbedder,
-    TextEmbedderConfig,
+    SentenceEmbedder,
+    SentenceEmbedderConfig,
+    TokenEmbedder,
+    TokenEmbedderConfig,
 )
 from torchTextClassifiers.tokenizers import BaseTokenizer, TokenizerOutput
 from torchTextClassifiers.value_encoder import ValueEncoder
@@ -56,6 +58,7 @@ class ModelConfig:
     categorical_embedding_dims: Optional[Union[List[int], int]] = None
     attention_config: Optional[AttentionConfig] = None
     n_heads_label_attention: Optional[int] = None
+    aggregation_method: Optional[str] = "mean"
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -177,26 +180,33 @@ class torchTextClassifiers:
         self.enable_label_attention = model_config.n_heads_label_attention is not None
 
         if self.tokenizer.output_vectorized:
-            self.text_embedder = None
+            self.token_embedder = None
             logger.info(
                 "Tokenizer outputs vectorized tokens; skipping TextEmbedder initialization."
             )
             self.embedding_dim = self.tokenizer.output_dim
         else:
-            text_embedder_config = TextEmbedderConfig(
+            token_embedder_config = TokenEmbedderConfig(
                 vocab_size=self.vocab_size,
                 embedding_dim=self.embedding_dim,
                 padding_idx=tokenizer.padding_idx,
                 attention_config=model_config.attention_config,
+            )
+            sentence_embedder_config = SentenceEmbedderConfig(
                 label_attention_config=LabelAttentionConfig(
                     n_head=model_config.n_heads_label_attention,
                     num_classes=model_config.num_classes,
+                    embedding_dim=self.embedding_dim,
                 )
                 if self.enable_label_attention
                 else None,
+                aggregation_method=model_config.aggregation_method,
             )
-            self.text_embedder = TextEmbedder(
-                text_embedder_config=text_embedder_config,
+            self.token_embedder = TokenEmbedder(
+                token_embedder_config=token_embedder_config,
+            )
+            self.sentence_embedder = SentenceEmbedder(
+                sentence_embedder_config=sentence_embedder_config
             )
 
         classif_head_input_dim = self.embedding_dim
@@ -221,7 +231,8 @@ class torchTextClassifiers:
         )
 
         self.pytorch_model = TextClassificationModel(
-            text_embedder=self.text_embedder,
+            token_embedder=self.token_embedder,
+            sentence_embedder=self.sentence_embedder,
             categorical_variable_net=self.categorical_var_net,
             classification_head=self.classification_head,
         )
@@ -279,7 +290,7 @@ class torchTextClassifiers:
         X_train, y_train = self._check_XY(
             X_train, y_train, training_config.raw_categorical_inputs, training_config.raw_labels
         )
-        print(X_train, y_train)
+
         if X_val is not None:
             assert y_val is not None, "y_val must be provided if X_val is provided."
         if y_val is not None:
@@ -572,7 +583,7 @@ class torchTextClassifiers:
         if explain:
             return_offsets_mapping = True  # to be passed to the tokenizer
             return_word_ids = True
-            if self.pytorch_model.text_embedder is None:
+            if self.pytorch_model.token_embedder is None:
                 raise RuntimeError(
                     "Explainability is not supported when the tokenizer outputs vectorized text directly. Please use a tokenizer that outputs token IDs."
                 )
@@ -583,7 +594,7 @@ class torchTextClassifiers:
                             "Captum is not installed and is required for explainability. Run 'pip install/uv add torchFastText[explainability]'."
                         )
                     lig = LayerIntegratedGradients(
-                        self.pytorch_model, self.pytorch_model.text_embedder.embedding_layer
+                        self.pytorch_model, self.pytorch_model.token_embedder.embedding_layer
                     )  # initialize a Captum layer gradient integrator
                 if explain_with_label_attention:
                     if not self.enable_label_attention:
