@@ -8,22 +8,27 @@ Modular torch.nn.Module components for building custom architectures.
 Text Embedding
 --------------
 
-TextEmbedder
-~~~~~~~~~~~~
+Text embedding is split into two composable stages:
 
-Embeds text tokens with optional self-attention.
+1. **TokenEmbedder** — maps each token to a dense vector (with optional self-attention). Output: ``(batch, seq_len, embedding_dim)``.
+2. **SentenceEmbedder** — aggregates token vectors into a sentence embedding. Output: ``(batch, embedding_dim)`` or ``(batch, num_classes, embedding_dim)`` with label attention.
 
-.. autoclass:: torchTextClassifiers.model.components.text_embedder.TextEmbedder
+TokenEmbedder
+~~~~~~~~~~~~~
+
+Embeds tokenized text with optional self-attention.
+
+.. autoclass:: torchTextClassifiers.model.components.text_embedder.TokenEmbedder
    :members:
    :undoc-members:
    :show-inheritance:
 
-TextEmbedderConfig
-~~~~~~~~~~~~~~~~~~
+TokenEmbedderConfig
+~~~~~~~~~~~~~~~~~~~
 
-Configuration for TextEmbedder.
+Configuration for TokenEmbedder.
 
-.. autoclass:: torchTextClassifiers.model.components.text_embedder.TextEmbedderConfig
+.. autoclass:: torchTextClassifiers.model.components.text_embedder.TokenEmbedderConfig
    :members:
    :undoc-members:
    :show-inheritance:
@@ -32,31 +37,90 @@ Example:
 
 .. code-block:: python
 
-   from torchTextClassifiers.model.components import TextEmbedder, TextEmbedderConfig
+   from torchTextClassifiers.model.components import (
+       TokenEmbedder, TokenEmbedderConfig, AttentionConfig,
+   )
 
-   # Simple text embedder
-   config = TextEmbedderConfig(
+   # Simple token embedder (no self-attention)
+   config = TokenEmbedderConfig(
        vocab_size=5000,
        embedding_dim=128,
-       attention_config=None
+       padding_idx=0,
    )
-   embedder = TextEmbedder(config)
+   token_embedder = TokenEmbedder(config)
+   out = token_embedder(input_ids, attention_mask)
+   # out["token_embeddings"]: (batch, seq_len, 128)
 
    # With self-attention
-   from torchTextClassifiers.model.components import AttentionConfig
-
    attention_config = AttentionConfig(
-       n_embd=128,
+       n_layers=2,
        n_head=4,
-       n_layer=2,
-       dropout=0.1
+       n_kv_head=4,
+       positional_encoding=False,
    )
-   config = TextEmbedderConfig(
+   config = TokenEmbedderConfig(
        vocab_size=5000,
        embedding_dim=128,
-       attention_config=attention_config
+       padding_idx=0,
+       attention_config=attention_config,
    )
-   embedder = TextEmbedder(config)
+   token_embedder = TokenEmbedder(config)
+
+SentenceEmbedder
+~~~~~~~~~~~~~~~~
+
+Aggregates per-token embeddings into a single sentence embedding.
+
+.. autoclass:: torchTextClassifiers.model.components.text_embedder.SentenceEmbedder
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+SentenceEmbedderConfig
+~~~~~~~~~~~~~~~~~~~~~~
+
+Configuration for SentenceEmbedder.
+
+.. autoclass:: torchTextClassifiers.model.components.text_embedder.SentenceEmbedderConfig
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+LabelAttentionConfig
+~~~~~~~~~~~~~~~~~~~~
+
+Configuration for the label-attention aggregation mode.
+
+.. autoclass:: torchTextClassifiers.model.components.text_embedder.LabelAttentionConfig
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Example:
+
+.. code-block:: python
+
+   from torchTextClassifiers.model.components import (
+       SentenceEmbedder, SentenceEmbedderConfig,
+       LabelAttentionConfig,
+   )
+
+   # Mean-pooling (default)
+   sentence_embedder = SentenceEmbedder(SentenceEmbedderConfig(aggregation_method="mean"))
+   out = sentence_embedder(token_embeddings, attention_mask)
+   # out["sentence_embedding"]: (batch, 128)
+
+   # Label attention — one embedding per class
+   sentence_embedder = SentenceEmbedder(SentenceEmbedderConfig(
+       aggregation_method=None,
+       label_attention_config=LabelAttentionConfig(
+           n_head=4,
+           num_classes=6,
+           embedding_dim=128,
+       ),
+   ))
+   out = sentence_embedder(token_embeddings, attention_mask)
+   # out["sentence_embedding"]: (batch, num_classes, 128)
 
 Categorical Features
 --------------------
@@ -246,22 +310,31 @@ Components can be composed to create custom architectures:
 
 .. code-block:: python
 
+   import torch
    import torch.nn as nn
    from torchTextClassifiers.model.components import (
-       TextEmbedder, CategoricalVariableNet, ClassificationHead
+       TokenEmbedder, TokenEmbedderConfig,
+       SentenceEmbedder, SentenceEmbedderConfig,
+       CategoricalVariableNet, ClassificationHead,
    )
 
    class CustomModel(nn.Module):
        def __init__(self):
            super().__init__()
-           self.text_embedder = TextEmbedder(text_config)
+           self.token_embedder = TokenEmbedder(TokenEmbedderConfig(
+               vocab_size=5000, embedding_dim=128, padding_idx=0,
+           ))
+           self.sentence_embedder = SentenceEmbedder(SentenceEmbedderConfig())
            self.cat_net = CategoricalVariableNet(...)
            self.head = ClassificationHead(...)
 
-       def forward(self, input_ids, categorical_data):
-           text_features = self.text_embedder(input_ids)
+       def forward(self, input_ids, attention_mask, categorical_data):
+           token_out = self.token_embedder(input_ids, attention_mask)
+           sent_out = self.sentence_embedder(
+               token_out["token_embeddings"], token_out["attention_mask"]
+           )
            cat_features = self.cat_net(categorical_data)
-           combined = torch.cat([text_features, cat_features], dim=1)
+           combined = torch.cat([sent_out["sentence_embedding"], cat_features], dim=1)
            return self.head(combined)
 
 See Also
@@ -270,4 +343,3 @@ See Also
 * :doc:`model` - How components are used in models
 * :doc:`../architecture/overview` - Architecture explanation
 * :doc:`configs` - ModelConfig for component configuration
-
