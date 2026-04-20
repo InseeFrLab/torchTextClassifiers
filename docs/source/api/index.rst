@@ -11,7 +11,7 @@ The API is organized into several modules:
 * :doc:`wrapper` - High-level torchTextClassifiers wrapper class
 * :doc:`configs` - Configuration classes (ModelConfig, TrainingConfig)
 * :doc:`tokenizers` - Text tokenization (NGram, WordPiece, HuggingFace)
-* :doc:`components` - Model components (TextEmbedder, CategoricalVariableNet, etc.)
+* :doc:`components` - Model components (TokenEmbedder, SentenceEmbedder, CategoricalVariableNet, etc.)
 * :doc:`model` - Core PyTorch models
 * :doc:`dataset` - Dataset classes for data loading
 
@@ -30,7 +30,8 @@ Most Used Classes
 Architecture Components
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-* :class:`torchTextClassifiers.model.components.TextEmbedder` - Text embedding layer
+* :class:`torchTextClassifiers.model.components.text_embedder.TokenEmbedder` - Token embedding layer
+* :class:`torchTextClassifiers.model.components.text_embedder.SentenceEmbedder` - Sentence aggregation layer
 * :class:`torchTextClassifiers.model.components.CategoricalVariableNet` - Categorical features
 * :class:`torchTextClassifiers.model.components.ClassificationHead` - Classification layer
 * :class:`torchTextClassifiers.model.components.Attention.AttentionConfig` - Attention configuration

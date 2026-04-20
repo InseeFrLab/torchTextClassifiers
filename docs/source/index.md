@@ -166,7 +166,7 @@ Work with a consistent, simple API whether you're doing binary, multiclass, or m
 
 ### Flexible Components
 
-All components (`TextEmbedder`, `CategoricalVariableNet`, `ClassificationHead`) are standard `torch.nn.Module` objects. Mix and match them or create your own custom components.
+All components (`TokenEmbedder`, `SentenceEmbedder`, `CategoricalVariableNet`, `ClassificationHead`) are standard `torch.nn.Module` objects. Mix and match them or create your own custom components.
 
 ### Production Ready
 
