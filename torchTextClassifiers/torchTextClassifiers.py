@@ -30,10 +30,10 @@ from torchTextClassifiers.model.components import (
     CategoricalVariableNet,
     ClassificationHead,
     LabelAttentionConfig,
+    SentenceEmbedder,
+    SentenceEmbedderConfig,
     TokenEmbedder,
     TokenEmbedderConfig,
-    SentenceEmbedder,
-    SentenceEmbedderConfig
 )
 from torchTextClassifiers.tokenizers import BaseTokenizer, TokenizerOutput
 from torchTextClassifiers.value_encoder import ValueEncoder
@@ -180,7 +180,7 @@ class torchTextClassifiers:
         self.enable_label_attention = model_config.n_heads_label_attention is not None
 
         if self.tokenizer.output_vectorized:
-            self.text_embedder = None
+            self.token_embedder = None
             logger.info(
                 "Tokenizer outputs vectorized tokens; skipping TextEmbedder initialization."
             )
@@ -193,14 +193,14 @@ class torchTextClassifiers:
                 attention_config=model_config.attention_config,
             )
             sentence_embedder_config = SentenceEmbedderConfig(
-                label_attention_config = LabelAttentionConfig(
-                        n_head=model_config.n_heads_label_attention,
-                        num_classes=model_config.num_classes,
-                        embedding_dim=self.embedding_dim
-                    )
-                    if self.enable_label_attention
-                    else None,
-                aggregation_method=model_config.aggregation_method
+                label_attention_config=LabelAttentionConfig(
+                    n_head=model_config.n_heads_label_attention,
+                    num_classes=model_config.num_classes,
+                    embedding_dim=self.embedding_dim,
+                )
+                if self.enable_label_attention
+                else None,
+                aggregation_method=model_config.aggregation_method,
             )
             self.token_embedder = TokenEmbedder(
                 token_embedder_config=token_embedder_config,
@@ -290,7 +290,7 @@ class torchTextClassifiers:
         X_train, y_train = self._check_XY(
             X_train, y_train, training_config.raw_categorical_inputs, training_config.raw_labels
         )
-        print(X_train, y_train)
+
         if X_val is not None:
             assert y_val is not None, "y_val must be provided if X_val is provided."
         if y_val is not None:
@@ -583,7 +583,7 @@ class torchTextClassifiers:
         if explain:
             return_offsets_mapping = True  # to be passed to the tokenizer
             return_word_ids = True
-            if self.pytorch_model.text_embedder is None:
+            if self.pytorch_model.token_embedder is None:
                 raise RuntimeError(
                     "Explainability is not supported when the tokenizer outputs vectorized text directly. Please use a tokenizer that outputs token IDs."
                 )
@@ -594,7 +594,7 @@ class torchTextClassifiers:
                             "Captum is not installed and is required for explainability. Run 'pip install/uv add torchFastText[explainability]'."
                         )
                     lig = LayerIntegratedGradients(
-                        self.pytorch_model, self.pytorch_model.text_embedder.embedding_layer
+                        self.pytorch_model, self.pytorch_model.token_embedder.embedding_layer
                     )  # initialize a Captum layer gradient integrator
                 if explain_with_label_attention:
                     if not self.enable_label_attention:

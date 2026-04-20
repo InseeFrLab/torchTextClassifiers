@@ -46,6 +46,9 @@ class TokenEmbedder(nn.Module):
 
     """
 
+    cos: torch.Tensor
+    sin: torch.Tensor
+
     def __init__(self, token_embedder_config: TokenEmbedderConfig):
         super().__init__()
 
@@ -112,10 +115,7 @@ class TokenEmbedder(nn.Module):
             for block in self.transformer.h:
                 torch.nn.init.zeros_(block.mlp.c_proj.weight)
                 torch.nn.init.zeros_(block.attn.c_proj.weight)
-            # init the rotary embeddings
-            head_dim = self.attention_config.n_embd // self.attention_config.n_head
-            cos, sin = self._precompute_rotary_embeddings(self.rotary_seq_len, head_dim)
-            self.cos, self.sin = cos, sin
+
         # Cast the embeddings from fp32 to bf16: optim can tolerate it and it saves memory: both in the model and the activations
         if self.embedding_layer.weight.device.type == "cuda":
             self.embedding_layer.to(dtype=torch.bfloat16)
@@ -205,9 +205,7 @@ class LabelAttention(nn.Module):
         super().__init__()
 
         if label_attention_config is None:
-            raise ValueError(
-                "label_attention_config must be provided to use LabelAttention."
-            )
+            raise ValueError("label_attention_config must be provided to use LabelAttention.")
 
         self.label_attention_config = label_attention_config
         self.num_classes = label_attention_config.num_classes
@@ -311,7 +309,7 @@ class LabelAttention(nn.Module):
 
 class SentenceEmbedder(nn.Module):
     def __init__(self, sentence_embedder_config: SentenceEmbedderConfig):
-
+        super().__init__()
         """
         A module to aggregate token embeddings.
 
@@ -322,7 +320,7 @@ class SentenceEmbedder(nn.Module):
         - aggregation_method=None: in that case you need to provide a label attention
         """
 
-        self.config
+        self.config = sentence_embedder_config
         self.label_attention_config = sentence_embedder_config.label_attention_config
         self.aggregation_method = sentence_embedder_config.aggregation_method
 
