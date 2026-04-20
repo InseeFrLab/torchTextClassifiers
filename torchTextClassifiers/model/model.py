@@ -15,7 +15,8 @@ from torchTextClassifiers.model.components import (
     CategoricalForwardType,
     CategoricalVariableNet,
     ClassificationHead,
-    TextEmbedder,
+    SentenceEmbedder,
+    TokenEmbedder,
 )
 from torchTextClassifiers.model.components.attention import norm
 
@@ -38,12 +39,11 @@ logging.basicConfig(
 
 
 class TextClassificationModel(nn.Module):
-    """FastText Pytorch Model."""
-
     def __init__(
         self,
         classification_head: ClassificationHead,
-        text_embedder: Optional[TextEmbedder] = None,
+        token_embedder: Optional[TokenEmbedder] = None,
+        sentence_embedder: Optional[SentenceEmbedder] = None,
         categorical_variable_net: Optional[CategoricalVariableNet] = None,
     ):
         """
@@ -51,14 +51,23 @@ class TextClassificationModel(nn.Module):
 
         Args:
             classification_head (ClassificationHead): The classification head module.
-            text_embedder (Optional[TextEmbedder]): The text embedding module.
+            token_embedder (Optional[TextEmbedder]): The text embedding module.
                 If not provided, assumes that input text is already embedded (as tensors) and directly passed to the classification head.
+            sentence_embedder:
             categorical_variable_net (Optional[CategoricalVariableNet]): The categorical variable network module.
                 If not provided, assumes no categorical variables are used.
         """
         super().__init__()
 
-        self.text_embedder = text_embedder
+        self.token_embedder = token_embedder
+        self.sentence_embedder = sentence_embedder
+
+        if self.token_embedder is not None:
+            self.token_embedder.init_weights()
+            if self.sentence_embedder is None:
+                raise ValueError(
+                    "You have provided a TokenEmbedder but no SentenceEmbedder: please provide one."
+                )
 
         self.categorical_variable_net = categorical_variable_net
         if not self.categorical_variable_net:
@@ -69,42 +78,40 @@ class TextClassificationModel(nn.Module):
         self._validate_component_connections()
 
         torch.nn.init.zeros_(self.classification_head.net.weight)
-        if self.text_embedder is not None:
-            self.text_embedder.init_weights()
 
     def _validate_component_connections(self):
-        def _check_text_categorical_connection(self, text_embedder, cat_var_net):
+        def _check_text_categorical_connection(self, token_embedder, cat_var_net):
             if cat_var_net.forward_type == CategoricalForwardType.SUM_TO_TEXT:
-                if text_embedder.embedding_dim != cat_var_net.output_dim:
+                if token_embedder.embedding_dim != cat_var_net.output_dim:
                     raise ValueError(
                         "Text embedding dimension must match categorical variable embedding dimension."
                     )
-                self.expected_classification_head_input_dim = text_embedder.embedding_dim
+                self.expected_classification_head_input_dim = token_embedder.embedding_dim
             else:
                 self.expected_classification_head_input_dim = (
-                    text_embedder.embedding_dim + cat_var_net.output_dim
+                    token_embedder.embedding_dim + cat_var_net.output_dim
                 )
 
-        if self.text_embedder:
+        if self.token_embedder:
             if self.categorical_variable_net:
                 _check_text_categorical_connection(
-                    self, self.text_embedder, self.categorical_variable_net
+                    self, self.token_embedder, self.categorical_variable_net
                 )
             else:
-                self.expected_classification_head_input_dim = self.text_embedder.embedding_dim
+                self.expected_classification_head_input_dim = self.token_embedder.embedding_dim
 
             if self.expected_classification_head_input_dim != self.classification_head.input_dim:
                 raise ValueError(
                     "Classification head input dimension does not match expected dimension from text embedder and categorical variable net."
                 )
-            if self.text_embedder.enable_label_attention:
+            if self.sentence_embedder.label_attention_config is not None:
                 self.enable_label_attention = True
                 if self.classification_head.num_classes != 1:
                     raise ValueError(
                         "Label attention is enabled. TextEmbedder outputs a (num_classes, embedding_dim) tensor, so the ClassificationHead should have an output dimension of 1."
                     )
                 # if enable_label_attention is True, label_attention_config exists - and contains num_classes necessarily
-                self.num_classes = self.text_embedder.config.label_attention_config.num_classes
+                self.num_classes = self.sentence_embedder.label_attention_config.num_classes
             else:
                 self.enable_label_attention = False
                 self.num_classes = self.classification_head.num_classes
@@ -140,23 +147,24 @@ class TextClassificationModel(nn.Module):
         """
         encoded_text = input_ids  # clearer name
         label_attention_matrix = None
-        if self.text_embedder is None:
+        if self.token_embedder is None:
             x_text = encoded_text.float()
             if return_label_attention_matrix:
                 raise ValueError(
-                    "return_label_attention_matrix=True requires a text_embedder with label attention enabled"
+                    "return_label_attention_matrix=True requires a token_embedder with label attention enabled"
                 )
         else:
-            text_embed_output = self.text_embedder(
+            token_embed_output = self.token_embedder(
                 input_ids=encoded_text,
                 attention_mask=attention_mask,
-                return_label_attention_matrix=return_label_attention_matrix,
             )
-            x_text = text_embed_output["sentence_embedding"]
-            if isinstance(return_label_attention_matrix, torch.Tensor):
-                return_label_attention_matrix = return_label_attention_matrix[0].item()
+            x_token = token_embed_output["token_embeddings"]
+            sentence_embedding_output = self.sentence_embedder(
+                x_token, attention_mask, return_label_attention_matrix=return_label_attention_matrix
+            )
+            x_text = sentence_embedding_output["sentence_embedding"]
             if return_label_attention_matrix:
-                label_attention_matrix = text_embed_output["label_attention_matrix"]
+                label_attention_matrix = sentence_embedding_output["label_attention_matrix"]
 
         if self.categorical_variable_net:
             x_cat = self.categorical_variable_net(categorical_vars)

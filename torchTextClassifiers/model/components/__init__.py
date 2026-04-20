@@ -9,5 +9,5 @@ from .categorical_var_net import (
 )
 from .classification_head import ClassificationHead as ClassificationHead
 from .text_embedder import LabelAttentionConfig as LabelAttentionConfig
-from .text_embedder import TextEmbedder as TextEmbedder
-from .text_embedder import TextEmbedderConfig as TextEmbedderConfig
+from .text_embedder import TokenEmbedder as TokenEmbedder, TokenEmbedderConfig as TokenEmbedderConfig
+from .text_embedder import SentenceEmbedder as SentenceEmbedder, SentenceEmbedderConfig as SentenceEmbedderConfig

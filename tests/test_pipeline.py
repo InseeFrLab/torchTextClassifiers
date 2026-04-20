@@ -11,8 +11,10 @@ from torchTextClassifiers.model.components import (
     CategoricalVariableNet,
     ClassificationHead,
     LabelAttentionConfig,
-    TextEmbedder,
-    TextEmbedderConfig,
+    SentenceEmbedder,
+    SentenceEmbedderConfig,
+    TokenEmbedder,
+    TokenEmbedderConfig,
 )
 from torchTextClassifiers.tokenizers import NGramTokenizer
 from torchTextClassifiers.value_encoder import DictEncoder, ValueEncoder
@@ -122,24 +124,29 @@ def run_full_pipeline(
         sequence_len=sequence_len,
     )
 
-    # Create text embedder
-    text_embedder_config = TextEmbedderConfig(
+    # Create token embedder
+    token_embedder_config = TokenEmbedderConfig(
         vocab_size=vocab_size,
         embedding_dim=model_params["embedding_dim"],
         padding_idx=padding_idx,
         attention_config=attention_config,
+    )
+    token_embedder = TokenEmbedder(token_embedder_config=token_embedder_config)
+
+    # Create sentence embedder
+    sentence_embedder_config = SentenceEmbedderConfig(
         label_attention_config=(
             LabelAttentionConfig(
                 n_head=attention_config.n_head,
                 num_classes=num_classes,
+                embedding_dim=model_params["embedding_dim"],
             )
             if label_attention_enabled
             else None
         ),
+        aggregation_method=None if label_attention_enabled else "mean",
     )
-
-    text_embedder = TextEmbedder(text_embedder_config=text_embedder_config)
-    text_embedder.init_weights()
+    sentence_embedder = SentenceEmbedder(sentence_embedder_config=sentence_embedder_config)
 
     # Create categorical variable net (vocab sizes from fitted encoder)
     categorical_var_net = CategoricalVariableNet(
@@ -156,7 +163,8 @@ def run_full_pipeline(
 
     # Create model
     model = TextClassificationModel(
-        text_embedder=text_embedder,
+        token_embedder=token_embedder,
+        sentence_embedder=sentence_embedder,
         categorical_variable_net=categorical_var_net,
         classification_head=classification_head,
     )

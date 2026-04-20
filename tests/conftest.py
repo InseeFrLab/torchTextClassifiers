@@ -63,6 +63,7 @@ def mock_tokenizer():
     tokenizer = Mock()
     tokenizer.vocab_size = 1000
     tokenizer.padding_idx = 1
+    tokenizer.output_vectorized = False
     tokenizer.tokenize = Mock(
         return_value={
             "input_ids": np.array([[1, 2, 3], [4, 5, 6]]),
