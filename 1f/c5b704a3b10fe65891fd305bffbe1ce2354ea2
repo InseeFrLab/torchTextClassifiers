@@ -1,0 +1,23 @@
+README.md
+  aae6df563d6f3722 13-14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "1fc5b704a3b10fe65891fd305bffbe1ce2354ea2",
+  "prompts": {
+    "aae6df563d6f3722": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "81eabf40-a721-490c-ace0-3113add87e65",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "meilame-tayebjee",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 2,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}
