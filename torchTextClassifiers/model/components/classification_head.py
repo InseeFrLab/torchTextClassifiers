@@ -25,7 +25,7 @@ class ClassificationHead(nn.Module):
         super().__init__()
         if net is not None:
             self.net = net
-            
+
             # --- Custom net should either be a Sequential or a Linear ---
             if not (isinstance(net, nn.Sequential) or isinstance(net, nn.Linear)):
                 raise ValueError("net must be an nn.Sequential when provided.")
