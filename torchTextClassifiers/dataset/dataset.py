@@ -52,6 +52,8 @@ class TextClassificationDataset(Dataset):
                     logger.warning(
                         "ragged_multilabel set to True but max label value is 1. If your labels are already one-hot encoded, set ragged_multilabel to False. Otherwise computations are likely to be wrong."
                     )
+        elif not self.ragged_multilabel and self.labels is not None:
+            self.labels = torch.tensor(labels, dtype=torch.long)
 
     def __len__(self):
         return len(self.texts)
@@ -100,7 +102,7 @@ class TextClassificationDataset(Dataset):
                 labels_tensor[rows, cols] = 1
 
             else:
-                labels_tensor = torch.tensor(labels)
+                labels_tensor = torch.stack(list(labels))
         else:
             labels_tensor = None
 

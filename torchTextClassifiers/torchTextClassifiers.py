@@ -3,7 +3,7 @@ import pickle
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, Dict, List, Optional, Tuple, Type, Union, cast
 
 try:
     from captum.attr import LayerIntegratedGradients
@@ -21,6 +21,7 @@ from pytorch_lightning.callbacks import (
     LearningRateMonitor,
     ModelCheckpoint,
 )
+from torch import nn
 
 from torchTextClassifiers.dataset import TextClassificationDataset
 from torchTextClassifiers.model import TextClassificationModel, TextClassificationModule
@@ -53,7 +54,7 @@ class ModelConfig:
     """Base configuration class for text classifiers."""
 
     embedding_dim: int
-    num_classes: Optional[int] = None
+    num_classes: Optional[int | list[int]] = None
     categorical_vocabulary_sizes: Optional[List[int]] = None
     categorical_embedding_dims: Optional[Union[List[int], int]] = None
     attention_config: Optional[AttentionConfig] = None
@@ -237,6 +238,44 @@ class torchTextClassifiers:
             classification_head=self.classification_head,
         )
 
+    @classmethod
+    def from_model(
+        cls,
+        tokenizer: BaseTokenizer,
+        pytorch_model: nn.Module,
+        value_encoder: Optional[ValueEncoder] = None,
+        ragged_multilabel: Optional[bool] = False,
+    ):
+        """Initialize torchTextClassifiers from a pre-built PyTorch model.
+
+        This method allows users to create a torchTextClassifiers instance using a pre-built PyTorch model that may not follow the standard architecture expected by the main constructor. The provided model should be compatible with the input format used in the predict method (i.e., it should accept tokenized text and categorical variables as input).
+
+        Args:
+            tokenizer: A tokenizer instance for text preprocessing
+            pytorch_model: A pre-built PyTorch model to be used for predictions
+            value_encoder: Optional ValueEncoder for encoding raw string (or mixed) categorical values to integers. Build it beforehand from DictEncoder or sklearn LabelEncoder instances and pass it here. If None, categorical columns in X must already be integer-encoded.
+
+        Returns:
+            An instance of torchTextClassifiers initialized with the provided model and tokenizer.
+        """
+        instance = cls.__new__(cls)
+        instance.tokenizer = tokenizer
+        instance.pytorch_model = pytorch_model
+        instance.num_classes = pytorch_model.num_classes
+        instance.categorical_var_net = cast(
+            Optional[CategoricalVariableNet], pytorch_model.categorical_variable_net
+        )
+        instance.value_encoder = value_encoder
+        instance.ragged_multilabel = ragged_multilabel
+        instance._custom_model = True
+        instance.enable_label_attention = False
+        instance.categorical_vocabulary_sizes = (
+            instance.categorical_var_net.categorical_vocabulary_sizes
+            if instance.categorical_var_net is not None
+            else None
+        )
+        return instance
+
     def train(
         self,
         X_train: np.ndarray,
@@ -301,9 +340,9 @@ class torchTextClassifiers:
             X_val, y_val = self._check_XY(X_val, y_val)
 
         if (
-            X_train["categorical_variables"] is not None
-            and X_val is not None
-            and X_val["categorical_variables"] is not None
+            (X_train["categorical_variables"] is not None)
+            and (X_val is not None)
+            and (X_val["categorical_variables"] is not None)
         ):
             assert (
                 X_train["categorical_variables"].ndim > 1
@@ -550,7 +589,16 @@ class torchTextClassifiers:
                 Y = self.value_encoder.transform_labels(Y)
             Y = Y.astype(int)
 
-            if Y.max() >= self.num_classes or Y.min() < 0:
+            if isinstance(self.num_classes, list):
+                num_classes_arr = np.array(self.num_classes)
+
+                print(Y, num_classes_arr)
+                if (Y.max(axis=0) >= num_classes_arr).any() or Y.min() < 0:
+                    raise ValueError(
+                        f"Y contains class labels outside the expected per-level ranges "
+                        f"[0, {[nc - 1 for nc in self.num_classes]}]."
+                    )
+            elif Y.max() >= self.num_classes or Y.min() < 0:
                 raise ValueError(
                     f"Y contains class labels outside the range [0, {self.num_classes - 1}]."
                 )
@@ -638,6 +686,33 @@ class torchTextClassifiers:
             categorical_vars,
             return_label_attention_matrix=explain_with_label_attention,
         )  # forward pass, contains the prediction scores (len(text), num_classes)
+
+        # Multilevel custom model: returns a list of per-level logit tensors.
+        # Each level may have a different number of classes, so we process them
+        # separately then stack into (N, top_k, n_levels) before decoding.
+        if isinstance(model_output, list):
+            int_preds_per_level: List[np.ndarray] = []
+            conf_per_level: List[torch.Tensor] = []
+            for level_logits in cast(List[torch.Tensor], model_output):
+                scores = level_logits.detach().cpu().softmax(dim=-1)
+                level_topk = torch.topk(scores, k=top_k, dim=-1)
+                int_preds_per_level.append(level_topk.indices.numpy())  # (N, top_k)
+                conf_per_level.append(level_topk.values)  # (N, top_k)
+
+            # (N, top_k, n_levels)
+            int_preds_stacked = np.stack(int_preds_per_level, axis=-1)
+            conf_stacked = torch.stack(conf_per_level, dim=-1)
+
+            if self.value_encoder is not None:
+                predictions = self.value_encoder.inverse_transform_labels(int_preds_stacked)
+            else:
+                predictions = int_preds_stacked
+
+            return {
+                "prediction": predictions,
+                "confidence": torch.round(conf_stacked, decimals=2),
+            }
+
         pred = (
             model_output["logits"] if explain_with_label_attention else model_output
         )  # (batch_size, num_classes)
@@ -710,38 +785,48 @@ class torchTextClassifiers:
         path = Path(path)
         path.mkdir(parents=True, exist_ok=True)
 
-        # Save the checkpoint if model has been trained
+        is_custom_model = getattr(self, "_custom_model", False)
+
+        # Custom models: save architecture as pickle + weights as state_dict.
+        # Standard models: save a full PyTorch Lightning checkpoint.
         checkpoint_path = None
-        if hasattr(self, "lightning_module"):
+        if is_custom_model:
+            with open(path / "pytorch_model.pkl", "wb") as f:
+                pickle.dump(self.pytorch_model, f)
+            torch.save(self.pytorch_model.state_dict(), path / "model_weights.pt")
+        elif hasattr(self, "lightning_module"):
             checkpoint_path = path / "model_checkpoint.ckpt"
-            # Save the current state as a checkpoint
             trainer = pl.Trainer()
             trainer.strategy.connect(self.lightning_module)
             trainer.save_checkpoint(checkpoint_path)
 
-        # Prepare metadata to save
-        metadata = {
-            "model_config": self.model_config.to_dict(),
+        metadata: Dict[str, Any] = {
+            "is_custom_model": is_custom_model,
+            "loss": self.lightning_module.loss if hasattr(self, "lightning_module") else None,
             "ragged_multilabel": self.ragged_multilabel,
-            "vocab_size": self.vocab_size,
-            "embedding_dim": self.embedding_dim,
-            "categorical_vocabulary_sizes": self.categorical_vocabulary_sizes,
             "num_classes": self.num_classes,
             "checkpoint_path": str(checkpoint_path) if checkpoint_path else None,
             "device": str(self.device) if hasattr(self, "device") else None,
             "has_value_encoder": self.value_encoder is not None,
         }
 
-        # Save metadata
+        if not is_custom_model:
+            metadata.update(
+                {
+                    "model_config": self.model_config.to_dict(),
+                    "vocab_size": self.vocab_size,
+                    "embedding_dim": self.embedding_dim,
+                    "categorical_vocabulary_sizes": self.categorical_vocabulary_sizes,
+                }
+            )
+
         with open(path / "metadata.pkl", "wb") as f:
             pickle.dump(metadata, f)
 
-        # Save tokenizer
         tokenizer_path = path / "tokenizer.pkl"
         with open(tokenizer_path, "wb") as f:
             pickle.dump(self.tokenizer, f)
 
-        # Save categorical encoder if present
         if self.value_encoder is not None:
             with open(path / "value_encoder.pkl", "wb") as f:
                 pickle.dump(self.value_encoder, f)
@@ -768,18 +853,18 @@ class torchTextClassifiers:
         if not path.exists():
             raise FileNotFoundError(f"Model directory not found: {path}")
 
-        # Load metadata
         with open(path / "metadata.pkl", "rb") as f:
             metadata = pickle.load(f)
 
-        # Load tokenizer
         with open(path / "tokenizer.pkl", "rb") as f:
             tokenizer = pickle.load(f)
 
-        # Reconstruct model_config
-        model_config = ModelConfig.from_dict(metadata["model_config"])
+        resolved_device = (
+            torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            if device == "auto"
+            else torch.device(device)
+        )
 
-        # Load categorical encoder if one was saved
         value_encoder = None
         if metadata.get("has_value_encoder"):
             encoder_path = path / "value_encoder.pkl"
@@ -787,7 +872,26 @@ class torchTextClassifiers:
                 with open(encoder_path, "rb") as f:
                     value_encoder = pickle.load(f)
 
-        # Create instance
+        if metadata.get("is_custom_model", False):
+            with open(path / "pytorch_model.pkl", "rb") as f:
+                pytorch_model = pickle.load(f)
+            weights_path = path / "model_weights.pt"
+            if weights_path.exists():
+                pytorch_model.load_state_dict(torch.load(weights_path, weights_only=True))
+                logger.info(f"Model weights loaded from {weights_path}")
+            instance = cls.from_model(
+                tokenizer=tokenizer,
+                pytorch_model=pytorch_model,
+                value_encoder=value_encoder,
+                ragged_multilabel=metadata["ragged_multilabel"],
+            )
+            instance.device = resolved_device
+            pytorch_model.to(resolved_device)
+            logger.info(f"Model loaded successfully from {path}")
+            return instance
+
+        model_config = ModelConfig.from_dict(metadata["model_config"])
+
         instance = cls(
             tokenizer=tokenizer,
             model_config=model_config,
@@ -795,24 +899,19 @@ class torchTextClassifiers:
             value_encoder=value_encoder,
         )
 
-        # Set device
-        if device == "auto":
-            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        else:
-            device = torch.device(device)
-        instance.device = device
+        instance.device = resolved_device
 
-        # Load checkpoint if it exists
-        if metadata["checkpoint_path"]:
+        if metadata.get("checkpoint_path"):
             checkpoint_path = path / "model_checkpoint.ckpt"
             if checkpoint_path.exists():
-                # Load the checkpoint with weights_only=False since it's our own trusted checkpoint
+                loss = metadata.get("loss") or torch.nn.CrossEntropyLoss()
                 instance.lightning_module = TextClassificationModule.load_from_checkpoint(
                     str(checkpoint_path),
                     model=instance.pytorch_model,
+                    loss=loss,
                     weights_only=False,
                 )
-                instance.pytorch_model = instance.lightning_module.model.to(device)
+                instance.pytorch_model = instance.lightning_module.model.to(resolved_device)
                 instance.checkpoint_path = str(checkpoint_path)
                 logger.info(f"Model checkpoint loaded from {checkpoint_path}")
             else:
