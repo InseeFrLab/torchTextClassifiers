@@ -36,11 +36,23 @@ class TextClassificationModule(pl.LightningModule):
             scheduler_interval: Scheduler interval.
         """
         super().__init__()
-        self.save_hyperparameters(ignore=["model"])
+        self.save_hyperparameters(ignore=["model", "loss"])
 
         self.model = model
         self.loss = loss
-        self.accuracy_fn = Accuracy(task="multiclass", num_classes=self.model.num_classes)
+
+        if not hasattr(self.model, "num_classes") or self.model.num_classes is None:
+            raise ValueError("Model must have num_classes attribute for accuracy calculation.")
+
+        if isinstance(self.model.num_classes, list):
+            self.accuracy_fn = torch.nn.ModuleList(
+                [Accuracy(task="multiclass", num_classes=n) for n in self.model.num_classes]
+            )
+            self.multilevel_accuracy = True
+        else:
+            self.accuracy_fn = Accuracy(task="multiclass", num_classes=self.model.num_classes)
+            self.multilevel_accuracy = False
+
         self.optimizer = optimizer
         self.optimizer_params = optimizer_params
         self.scheduler = scheduler
@@ -62,71 +74,42 @@ class TextClassificationModule(pl.LightningModule):
             categorical_vars=batch.get("categorical_vars", None),
         )
 
-    def training_step(self, batch, batch_idx: int) -> torch.Tensor:
-        """
-        Training step.
-
-        Args:
-            batch (List[torch.LongTensor]): Training batch.
-            batch_idx (int): Batch index.
-
-        Returns (torch.Tensor): Loss tensor.
-        """
-
+    def step(self, batch) -> tuple[torch.Tensor, torch.Tensor | list[torch.Tensor]]:
         targets = batch["labels"]
-
         outputs = self.forward(batch)
-
         if isinstance(self.loss, torch.nn.BCEWithLogitsLoss):
             targets = targets.float()
-
         loss = self.loss(outputs, targets)
+        if self.multilevel_accuracy:
+            accuracy = [
+                fn(out, targets[:, i]) for i, (fn, out) in enumerate(zip(self.accuracy_fn, outputs))
+            ]
+        else:
+            accuracy = self.accuracy_fn(outputs, targets)
+        return loss, accuracy
+
+    def _log_accuracy(self, accuracy: torch.Tensor | list[torch.Tensor], prefix: str, **kwargs):
+        if isinstance(accuracy, list):
+            for i, acc in enumerate(accuracy):
+                self.log(f"{prefix}_accuracy_level_{i}", acc, **kwargs)
+        else:
+            self.log(f"{prefix}_accuracy", accuracy, **kwargs)
+
+    def training_step(self, batch, batch_idx: int) -> torch.Tensor:
+        loss, accuracy = self.step(batch)
         self.log("train_loss", loss, on_epoch=True, on_step=True, prog_bar=True)
-        accuracy = self.accuracy_fn(outputs, targets)
-        self.log("train_accuracy", accuracy, on_epoch=True, on_step=False, prog_bar=True)
-
+        self._log_accuracy(accuracy, "train", on_epoch=True, on_step=False, prog_bar=True)
         torch.cuda.empty_cache()
-
         return loss
 
     def validation_step(self, batch, batch_idx: int):
-        """
-        Validation step.
-
-        Args:
-            batch (List[torch.LongTensor]): Validation batch.
-            batch_idx (int): Batch index.
-
-        Returns (torch.Tensor): Loss tensor.
-        """
-        targets = batch["labels"]
-
-        outputs = self.forward(batch)
-
-        loss = self.loss(outputs, targets)
+        loss, accuracy = self.step(batch)
         self.log("val_loss", loss, on_epoch=True, on_step=False, prog_bar=True, sync_dist=True)
-
-        accuracy = self.accuracy_fn(outputs, targets)
-        self.log("val_accuracy", accuracy, on_epoch=True, on_step=False, prog_bar=True)
+        self._log_accuracy(accuracy, "val", on_epoch=True, on_step=False, prog_bar=True)
         return loss
 
     def test_step(self, batch, batch_idx: int):
-        """
-        Test step.
-
-        Args:
-            batch (List[torch.LongTensor]): Test batch.
-            batch_idx (int): Batch index.
-
-        Returns (torch.Tensor): Loss tensor.
-        """
-        targets = batch["labels"]
-
-        outputs = self.forward(batch)
-        loss = self.loss(outputs, targets)
-
-        accuracy = self.accuracy_fn(outputs, targets)
-
+        loss, accuracy = self.step(batch)
         return loss, accuracy
 
     def predict_step(self, batch, batch_idx: int = 0, dataloader_idx: int = 0):
