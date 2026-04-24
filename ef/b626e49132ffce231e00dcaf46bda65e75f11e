@@ -1,0 +1,21 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.3",
+  "base_commit_sha": "efb626e49132ffce231e00dcaf46bda65e75f11e",
+  "prompts": {
+    "4368c68e85c84b80": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "05701cd9-d77d-45c6-acd9-4748b2a505b8",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "meilame-tayebjee",
+      "messages": [],
+      "total_additions": 5,
+      "total_deletions": 1,
+      "accepted_lines": 944,
+      "overriden_lines": 0
+    }
+  }
+}
