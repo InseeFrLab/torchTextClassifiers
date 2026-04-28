@@ -1,13 +1,15 @@
-from typing import Optional
+from typing import cast
 
 import numpy as np
 import pandas as pd
 import torch
 from sklearn.preprocessing import LabelEncoder
-from torch import nn
 
-import torchTextClassifiers
 from torchTextClassifiers import ModelConfig, TrainingConfig, torchTextClassifiers
+from torchTextClassifiers.contrib import (
+    MultiLevelCrossEntropyLoss,
+    MultiLevelTextClassificationModel,
+)
 from torchTextClassifiers.dataset import TextClassificationDataset
 from torchTextClassifiers.model import TextClassificationModule
 from torchTextClassifiers.model.components import (
@@ -167,106 +169,6 @@ for num_classes in value_encoder.num_classes:  # ty:ignore[not-iterable]
     all_classification_heads.append(classification_head)
 
 
-class MultiLevelTextClassificationModel(nn.Module):
-    def __init__(
-        self,
-        token_embedder: TokenEmbedder,
-        sentence_embedders: list[SentenceEmbedder],
-        classification_heads: list[ClassificationHead],
-        categorical_variable_net: CategoricalVariableNet,
-    ):
-        super().__init__()
-        self.token_embedder = token_embedder
-        self.sentence_embedders = sentence_embedders
-        self.classification_heads = classification_heads
-        self.categorical_variable_net = categorical_variable_net
-        self.num_classes: list[int] = [
-            self.sentence_embedders[i].label_attention_config.num_classes
-            if self.sentence_embedders[i].label_attention_config is not None
-            else self.classification_heads[i].num_classes
-            for i in range(len(self.sentence_embedders))
-        ]
-
-    def forward(self, input_ids, attention_mask, categorical_vars=None, **kwargs):
-        token_embed_output = self.token_embedder(input_ids, attention_mask)
-        x_token = token_embed_output["token_embeddings"]
-        x_cat = self.categorical_variable_net(categorical_vars)  # (bs, cat_emb_dim)
-
-        print(f"Token embeddings shape: {x_token.shape}")
-        print(
-            f"x_cat shape: {x_cat.shape}"
-        )  # Debugging line to check shape of categorical variable embeddings
-        outputs = []
-        for sentence_embedder, classification_head in zip(
-            self.sentence_embedders, self.classification_heads
-        ):
-            if sentence_embedder.label_attention_config is not None:
-                num_classes = sentence_embedder.label_attention_config.num_classes
-                x_cat_level = x_cat.unsqueeze(1).expand(-1, num_classes, -1)
-            else:
-                x_cat_level = x_cat
-
-            print(
-                f"x_cat_level shape: {x_cat_level.shape}"
-            )  # Debugging line to check shape of categorical variable embeddings after expansion
-            sentence_embedding = sentence_embedder(
-                token_embeddings=x_token, attention_mask=attention_mask
-            )[
-                "sentence_embedding"
-            ]  # (bs, embedding_dim) or (bs, num_classes, embedding_dim) if label attention
-
-            print(
-                f"Sentence embedding shape: {sentence_embedding.shape}"
-            )  # Debugging line to check shape of sentence embeddings
-            if (
-                self.categorical_variable_net.forward_type
-                == CategoricalForwardType.AVERAGE_AND_CONCAT
-                or self.categorical_variable_net.forward_type
-                == CategoricalForwardType.CONCATENATE_ALL
-            ):
-                x_combined = torch.cat((sentence_embedding, x_cat_level), dim=-1)
-            else:
-                assert (
-                    self.categorical_variable_net.forward_type == CategoricalForwardType.SUM_TO_TEXT
-                )
-
-                x_combined = sentence_embedding + x_cat_level
-
-            print(
-                f"x_combined shape: {x_combined.shape}"
-            )  # Debugging line to check shape of combined features before classification head
-            output = classification_head(x_combined).squeeze(-1)
-            outputs.append(output)
-            print(
-                f"Output shape for current level: {output.shape}"
-            )  # Debugging line to check shape of output logits for current level
-
-        return outputs
-
-
-class MultiLevelCrossEntropyLoss(nn.Module):
-    def __init__(self, num_classes: Optional[list[int]] = None):
-        super().__init__()
-        self.num_classes = num_classes
-        self.loss_fn = nn.CrossEntropyLoss()
-
-    def forward(self, outputs, labels):
-        total_loss = 0
-        for idx, output in enumerate(outputs):
-            label = labels[:, idx]  # (batch_size,)
-            if self.num_classes is not None:
-                total_loss += self.loss_fn(output.squeeze(), label) * self.num_classes[idx]
-            else:
-                total_loss += self.loss_fn(output.squeeze(), label)
-
-        if self.num_classes is not None:
-            total_weight = sum(self.num_classes)
-        else:
-            total_weight = len(outputs)
-
-        return total_loss / total_weight  # average loss across levels
-
-
 model = MultiLevelTextClassificationModel(
     token_embedder=token_embedder,
     sentence_embedders=all_sentence_embedders,
@@ -300,7 +202,7 @@ training_config = TrainingConfig(
     batch_size=6,
     lr=1e-3,
     raw_categorical_inputs=True,
-    loss=MultiLevelCrossEntropyLoss(num_classes=value_encoder.num_classes),
+    loss=MultiLevelCrossEntropyLoss(num_classes=cast(list[int], value_encoder.num_classes)),
 )
 
 ttc.train(
