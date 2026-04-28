@@ -1,0 +1,60 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.3",
+  "base_commit_sha": "b37aa657ca60dc34706a6b0cafcf9ca7a42ca073",
+  "prompts": {
+    "038236b029aab005": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7b1f6878-6a3c-4c46-9abc-142e0be2c3ce",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "meilame-tayebjee",
+      "messages": [],
+      "total_additions": 4,
+      "total_deletions": 4,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    },
+    "45ef9f63147f7f77": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dad3bd3f-23eb-4ae1-904f-096f40ce5c4b",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "meilame-tayebjee",
+      "messages": [],
+      "total_additions": 60,
+      "total_deletions": 19,
+      "accepted_lines": 54,
+      "overriden_lines": 0
+    },
+    "64bb484a4e725f8f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fb335918-e116-43a9-bef9-4a23cb95bbec",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "meilame-tayebjee",
+      "messages": [],
+      "total_additions": 144,
+      "total_deletions": 72,
+      "accepted_lines": 103,
+      "overriden_lines": 1
+    },
+    "aef1f23965c94ba5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2c39c907-fe59-4617-86fb-fd24f6c430d4",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "meilame-tayebjee",
+      "messages": [],
+      "total_additions": 37,
+      "total_deletions": 55,
+      "accepted_lines": 33,
+      "overriden_lines": 1
+    }
+  }
+}
