@@ -1,0 +1,27 @@
+torchTextClassifiers/contrib/__init__.py
+  7ec3c2969dc26fa9 1-13
+torchTextClassifiers/contrib/multilevel.py
+  7ec3c2969dc26fa9 1-135,137-191
+examples/multilevel_example.py
+  7ec3c2969dc26fa9 1,10,205
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "ea00b8b247301d2d612923d495ec58833e084f66",
+  "prompts": {
+    "7ec3c2969dc26fa9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "76e149b4-c5af-4506-a6be-4c85ba4b3c2a",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "meilame-tayebjee",
+      "messages": [],
+      "total_additions": 140,
+      "total_deletions": 7,
+      "accepted_lines": 347,
+      "overriden_lines": 3
+    }
+  }
+}
