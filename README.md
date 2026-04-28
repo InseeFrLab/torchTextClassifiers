@@ -11,7 +11,7 @@ A unified, extensible framework for text classification with categorical variabl
 - **Unified yet highly customizable**:
     - Use any tokenizer from HuggingFace or the original fastText's ngram tokenizer.
     - Text embedding is split into two composable stages: **`TokenEmbedder`** (token → per-token vectors, with optional self-attention) and **`SentenceEmbedder`** (aggregation: mean / first / last / label attention). Combine them with `CategoricalVariableNet` and `ClassificationHead` — all are `torch.nn.Module`.
-    - The `TextClassificationModel` class assembles these components and can be extended for custom behavior.
+    - **Two architecture paths**: use `ModelConfig` + the `torchTextClassifiers` constructor for the standard `TextClassificationModel` (zero boilerplate), or build any `nn.Module` you like and pass it to `torchTextClassifiers.from_model()` for full control. The `contrib` sub-package ships ready-made custom architectures (e.g. `MultiLevelTextClassificationModel` for multi-task classification) as reference implementations.
 - **Multiclass / multilabel classification support**: Support for both multiclass (only one label is true) and multi-label (several labels can be true) classification tasks.
 - **PyTorch Lightning**: Automated training with callbacks, early stopping, and logging
 - **Easy experimentation**: Simple API for training, evaluating, and predicting with minimal code:
@@ -56,6 +56,7 @@ See the [examples/](examples/) directory for:
 - Mixed features (text + categorical)
 - Advanced training configurations
 - Prediction and explainability
+- [Multi-level classification](examples/multilevel_example.py) — custom architecture via `from_model` and `contrib`
 
 ## 📄 License
 

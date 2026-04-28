@@ -10,6 +10,7 @@ multiclass_classification
 mixed_features
 explainability
 multilabel_classification
+custom_model
 ```
 
 ## Overview
@@ -116,6 +117,21 @@ Assign multiple labels to each text sample for complex classification scenarios.
 **Difficulty:** Advanced | **Time:** 30 minutes
 :::
 
+:::{grid-item-card} {fas}`puzzle-piece` Custom Architectures
+:link: custom_model
+:link-type: doc
+
+Plug any PyTorch model into the torchTextClassifiers wrapper via `from_model`.
+
+**What you'll learn:**
+- When to go beyond `TextClassificationModel`
+- The required `forward` / `num_classes` / `categorical_variable_net` interface
+- Using `contrib` classes as reference implementations
+- Multi-task classification with `MultiLevelTextClassificationModel`
+
+**Difficulty:** Advanced | **Time:** 30 minutes
+:::
+
 ::::
 
 ## Learning Path
@@ -130,6 +146,8 @@ graph LR
     C --> F[Multilabel Classification]
     D --> E[Explainability]
     F --> E
+    D --> G[Custom Architectures]
+    F --> G
 
     style A fill:#e3f2fd
     style B fill:#bbdefb
@@ -137,6 +155,7 @@ graph LR
     style D fill:#64b5f6
     style E fill:#1976d2
     style F fill:#42a5f5
+    style G fill:#0d47a1
 ```
 
 1. **Start with**: {doc}`../getting_started/quickstart` - Get familiar with the basics

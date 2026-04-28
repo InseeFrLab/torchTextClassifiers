@@ -599,6 +599,98 @@ predictions = classifier.predict(new_texts)
 - Don't need custom architecture
 - Want simplicity over control
 
+## Two Architecture Paths
+
+torchTextClassifiers offers two ways to build a classifier, covering different
+levels of customisation:
+
+### Path 1 — Standard architecture (ModelConfig)
+
+The `torchTextClassifiers` constructor accepts a `ModelConfig` and builds a
+`TextClassificationModel` for you automatically. This covers the vast majority
+of use cases: single-task binary, multi-class, or multi-label classification,
+with or without categorical variables, with or without self-attention and label
+attention.
+
+```python
+from torchTextClassifiers import torchTextClassifiers, ModelConfig
+
+classifier = torchTextClassifiers(
+    tokenizer=tokenizer,
+    model_config=ModelConfig(embedding_dim=128, num_classes=5),
+)
+classifier.train(texts, labels, training_config)
+predictions = classifier.predict(new_texts)
+```
+
+You never instantiate `TextClassificationModel` directly; `ModelConfig` is the
+only knob you need.
+
+### Path 2 — Custom architecture (from_model)
+
+When `TextClassificationModel` cannot express what you need — multiple
+classification heads, shared encoders across tasks, or any other topology —
+build your own `nn.Module` and wrap it with `torchTextClassifiers.from_model`.
+The wrapper then provides the same `predict` / `save` / `load` interface around
+your model.
+
+```python
+import torch.nn as nn
+from torchTextClassifiers import torchTextClassifiers
+
+class MyModel(nn.Module):
+    num_classes = 3
+    categorical_variable_net = None   # or a CategoricalVariableNet instance
+
+    def forward(self, input_ids, attention_mask, categorical_vars=None, **kwargs):
+        ...
+        return logits  # (batch, num_classes) — raw logits, not softmaxed
+
+classifier = torchTextClassifiers.from_model(
+    tokenizer=tokenizer,
+    pytorch_model=MyModel(),
+)
+```
+
+**Required interface for custom models:**
+
+| Requirement | Details |
+|---|---|
+| `forward(input_ids, attention_mask, categorical_vars=None, **kwargs)` | Exact positional names; extra kwargs are ignored |
+| Returns raw logits | `torch.Tensor` of shape `(batch, num_classes)`, or `list[torch.Tensor]` for multi-task |
+| `num_classes` attribute | `int` for single-task; `list[int]` for multi-task |
+| `categorical_variable_net` attribute | A `CategoricalVariableNet` instance, or `None` |
+
+### contrib — reference custom architectures
+
+The `torchTextClassifiers.contrib` sub-package ships example architectures that
+follow the `from_model` interface and can be used directly or as starting points:
+
+| Class | Purpose |
+|---|---|
+| `MultiLevelTextClassificationModel` | Multi-task classifier: one shared `TokenEmbedder`, one `SentenceEmbedder` + `ClassificationHead` per task |
+| `MultiLevelCrossEntropyLoss` | Weighted cross-entropy averaged across tasks |
+
+```python
+from torchTextClassifiers.contrib import (
+    MultiLevelTextClassificationModel,
+    MultiLevelCrossEntropyLoss,
+)
+
+model = MultiLevelTextClassificationModel(
+    token_embedder=token_embedder,
+    sentence_embedders=[se_level1, se_level2, se_level3],
+    classification_heads=[head1, head2, head3],
+    categorical_variable_net=cat_net,
+)
+classifier = torchTextClassifiers.from_model(tokenizer=tokenizer, pytorch_model=model)
+```
+
+See [examples/multilevel_example.py](https://github.com/InseeFrLab/torchTextClassifiers/blob/main/examples/multilevel_example.py)
+for a complete working script.
+
+---
+
 ## For Advanced Users
 
 ### Direct PyTorch Usage
