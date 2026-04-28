@@ -1,8 +1,7 @@
 import pytorch_lightning as pl
 import torch
+from torch import nn
 from torchmetrics import Accuracy
-
-from .model import TextClassificationModel
 
 # ============================================================================
 # PyTorch Lightning Module
@@ -14,7 +13,7 @@ class TextClassificationModule(pl.LightningModule):
 
     def __init__(
         self,
-        model: TextClassificationModel,
+        model: nn.Module,
         loss,
         optimizer,
         optimizer_params,
