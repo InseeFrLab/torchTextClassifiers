@@ -1,0 +1,31 @@
+README.md
+  7ec3c2969dc26fa9 14,59
+torchTextClassifiers/torchTextClassifiers.py
+  7ec3c2969dc26fa9 249,251-286,289-296,299
+docs/source/architecture/overview.md
+  7ec3c2969dc26fa9 602-693
+docs/source/tutorials/index.md
+  7ec3c2969dc26fa9 13,120-134,149-150,158
+docs/source/tutorials/custom_model.md
+  7ec3c2969dc26fa9 1-215
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "2300bfc491610185f7c6dc6ff6b1448e9b33b470",
+  "prompts": {
+    "7ec3c2969dc26fa9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "76e149b4-c5af-4506-a6be-4c85ba4b3c2a",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "meilame-tayebjee",
+      "messages": [],
+      "total_additions": 234,
+      "total_deletions": 0,
+      "accepted_lines": 374,
+      "overriden_lines": 0
+    }
+  }
+}
