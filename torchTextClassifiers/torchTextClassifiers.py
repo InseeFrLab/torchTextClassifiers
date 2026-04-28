@@ -246,17 +246,57 @@ class torchTextClassifiers:
         value_encoder: Optional[ValueEncoder] = None,
         ragged_multilabel: Optional[bool] = False,
     ):
-        """Initialize torchTextClassifiers from a pre-built PyTorch model.
+        """Initialize torchTextClassifiers from a custom pre-built PyTorch model.
 
-        This method allows users to create a torchTextClassifiers instance using a pre-built PyTorch model that may not follow the standard architecture expected by the main constructor. The provided model should be compatible with the input format used in the predict method (i.e., it should accept tokenized text and categorical variables as input).
+        Use this when the standard ``TextClassificationModel`` (built automatically
+        from ``ModelConfig``) cannot express your architecture — for example when you
+        need multiple classification heads, shared encoders across tasks, or any other
+        custom topology.  The wrapper then provides the usual ``predict`` / ``save`` /
+        ``load`` interface around your model.
+
+        **Required interface for** ``pytorch_model``:
+
+        1. **``forward`` signature** — the model must accept exactly these keyword
+           arguments (extra ``**kwargs`` are forwarded but ignored by the wrapper)::
+
+               def forward(
+                   self,
+                   input_ids: torch.Tensor,        # (batch, seq_len)  Long
+                   attention_mask: torch.Tensor,   # (batch, seq_len)  int
+                   categorical_vars: torch.Tensor, # (batch, n_cats)   Long  — may be None
+                   **kwargs,
+               ) -> torch.Tensor | list[torch.Tensor]:
+                   ...
+
+           The return value must be **raw logits** (not softmaxed).  For standard
+           single-task classification return a tensor of shape
+           ``(batch, num_classes)``.  For multi-task classification you may return a
+           list of such tensors, one per task.
+
+        2. **``num_classes`` attribute** — must be an ``int`` (single task) or a
+           ``list[int]`` (multi-task, one entry per task head).
+
+        3. **``categorical_variable_net`` attribute** — the ``CategoricalVariableNet``
+           module used by the model, or ``None`` if no categorical features are used.
+           The wrapper reads ``categorical_variable_net.categorical_vocabulary_sizes``
+           to set up the data pipeline.
+
+        See ``torchTextClassifiers.contrib`` for ready-made example architectures
+        (``MultiLevelTextClassificationModel``, ``MultiLevelCrossEntropyLoss``) that
+        follow this interface.
 
         Args:
-            tokenizer: A tokenizer instance for text preprocessing
-            pytorch_model: A pre-built PyTorch model to be used for predictions
-            value_encoder: Optional ValueEncoder for encoding raw string (or mixed) categorical values to integers. Build it beforehand from DictEncoder or sklearn LabelEncoder instances and pass it here. If None, categorical columns in X must already be integer-encoded.
+            tokenizer: A tokenizer instance for text preprocessing.
+            pytorch_model: A pre-built PyTorch model satisfying the interface above.
+            value_encoder: Optional ``ValueEncoder`` for encoding raw string (or
+                mixed) categorical values to integers.  Build it from ``DictEncoder``
+                or sklearn ``LabelEncoder`` instances and pass it here.  If ``None``,
+                categorical columns in ``X`` must already be integer-encoded.
+            ragged_multilabel: Set to ``True`` for ragged multi-label targets
+                (variable number of labels per sample).
 
         Returns:
-            An instance of torchTextClassifiers initialized with the provided model and tokenizer.
+            An instance of torchTextClassifiers wrapping the provided model.
         """
         instance = cls.__new__(cls)
         instance.tokenizer = tokenizer
