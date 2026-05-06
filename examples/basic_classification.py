@@ -125,6 +125,7 @@ def main():
         lr=1e-3,
         patience_early_stopping=5,
         num_workers=0,  # Use 0 for simple examples to avoid multiprocessing issues
+        raw_labels=False # no encoding needed, labels are already integers
     )
     classifier.train(
         X_train, y_train, training_config=training_config, X_val=X_val, y_val=y_val, verbose=True
