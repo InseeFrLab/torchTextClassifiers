@@ -142,6 +142,7 @@ def main():
         patience_early_stopping=7,
         num_workers=0,
         trainer_params={"deterministic": True},
+        raw_labels=False, # no encoding needed, labels are already integers 
     )
     classifier.train(
         X_train, y_train, training_config=training_config, X_val=X_val, y_val=y_val, verbose=True
