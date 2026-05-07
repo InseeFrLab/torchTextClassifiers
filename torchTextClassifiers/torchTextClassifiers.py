@@ -375,9 +375,10 @@ class torchTextClassifiers:
         if y_val is not None:
             assert X_val is not None, "X_val must be provided if y_val is provided."
 
-        X_val: Optional[Dict[str, Any]] = None
+        X_val_checked: Optional[Dict[str, Any]] = None
         if X_val is not None and y_val is not None:
-            X_val, y_val = self._check_XY(X_val, y_val)
+            X_val_checked, y_val = self._check_XY(X_val, y_val, training_config.raw_categorical_inputs, training_config.raw_labels)
+        X_val = X_val_checked
 
         if (
             (X_train["categorical_variables"] is not None)
