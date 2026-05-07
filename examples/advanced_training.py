@@ -122,6 +122,7 @@ def main():
         patience_early_stopping=5,
         num_workers=0,
         trainer_params={"deterministic": True},
+        raw_labels=False, # no encoding needed, labels are already integers
     )
 
     classifier.train(
@@ -162,6 +163,8 @@ def main():
         patience_early_stopping=7,
         num_workers=0,
         trainer_params=advanced_trainer_params,
+        raw_labels=False, # no encoding needed, labels are already integers
+
     )
 
     advanced_classifier.train(
@@ -196,6 +199,8 @@ def main():
         patience_early_stopping=3,
         num_workers=0,  # No multiprocessing for CPU
         trainer_params={"deterministic": True, "accelerator": "cpu"},
+        raw_labels=False, # no encoding needed, labels are already integers
+
     )
 
     cpu_classifier.train(
@@ -225,7 +230,6 @@ def main():
         "max_epochs": 25,
         "enable_progress_bar": True,
         "log_every_n_steps": 1,
-        "check_val_every_n_epoch": 2,  # Validate every 2 epochs
         "enable_checkpointing": True,
         "enable_model_summary": True,
         "deterministic": True,
@@ -238,6 +242,7 @@ def main():
         patience_early_stopping=8,
         num_workers=0,
         trainer_params=custom_trainer_params,
+        raw_labels=False, # no encoding needed, labels are already integers
     )
 
     custom_classifier.train(
