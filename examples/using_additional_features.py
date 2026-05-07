@@ -156,6 +156,8 @@ def train_and_evaluate_model(X, y, model_name, use_categorical=False, use_simple
         patience_early_stopping=3,
         num_workers=0,
         trainer_params={"enable_progress_bar": True, "deterministic": True},
+        raw_labels=False,  # no encoding needed, labels are already integers
+        raw_categorical_inputs=False,  # no encoding needed, categorical inputs are already integers
     )
 
     # Create and build model
@@ -172,7 +174,7 @@ def train_and_evaluate_model(X, y, model_name, use_categorical=False, use_simple
     if use_categorical:
         print("   ✅ Running validation for text-with-categorical-variables model...")
         try:
-            result = classifier.predict(X_test)
+            result = classifier.predict(X_test, raw_categorical_inputs=False)
             predictions = result["prediction"].squeeze().numpy()
             test_accuracy = (predictions == y_test).mean()
             print(f"   Test accuracy: {test_accuracy:.3f}")
