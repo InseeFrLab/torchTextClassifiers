@@ -150,6 +150,7 @@ def main():
         patience_early_stopping=5,
         num_workers=0,
         trainer_params={"deterministic": True},
+        raw_labels=False # no encoding needed, labels are already integers
     )
     classifier.train(
         X_train, y_train, training_config=training_config, X_val=X_val, y_val=y_val, verbose=True
@@ -279,7 +280,6 @@ def main():
                     # Extract attributions and mapping info
                     attributions = result["attributions"][0][0]  # shape: (seq_len,)
                     offset_mapping = result["offset_mapping"][0]  # List of (start, end) tuples
-                    word_ids = result["word_ids"][0]  # List of word IDs for each token
 
                     # Map token-level attributions to character-level (for ASCII visualization)
                     char_attributions = map_attributions_to_char(
