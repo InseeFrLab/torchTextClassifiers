@@ -279,7 +279,7 @@ class LabelAttention(nn.Module):
         attn_mask = None
         if attention_mask is not None:
             # Convert: 0 (padding) -> True (mask out), 1 (real) -> False (attend to)
-            attn_mask = attention_mask == 0  # (B, T)
+            attn_mask = attention_mask == 1  # (B, T)
             # Expand to (B, 1, 1, T) for broadcasting across heads and queries
             attn_mask = attn_mask.unsqueeze(1).unsqueeze(2)  # (B, 1, 1, T)
 
