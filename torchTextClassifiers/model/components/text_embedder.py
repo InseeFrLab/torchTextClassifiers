@@ -297,10 +297,10 @@ class LabelAttention(nn.Module):
 
             # Apply mask to attention scores before softmax
             if attention_mask is not None:
-                # attn_mask is already in the right shape: (B, 1, 1, T)
+                # attn_mask is already in the right shape: (B, 1, 1, T), True for real tokens
                 # We need to apply it to scores of shape (B, n_head, n_labels, T)
-                # Set masked positions to -inf so they become 0 after softmax
-                attention_scores = attention_scores.masked_fill(attn_mask, float("-inf"))
+                # Set padding positions (where attn_mask is False) to -inf so they become 0 after softmax
+                attention_scores = attention_scores.masked_fill(~attn_mask, float("-inf"))
 
             attention_matrix = torch.softmax(attention_scores, dim=-1)
 
