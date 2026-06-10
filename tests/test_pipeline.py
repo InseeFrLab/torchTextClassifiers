@@ -36,7 +36,7 @@ from torchTextClassifiers.utilities.plot_explainability import (
 
 def _is_huggingface_reachable() -> bool:
     try:
-        with urlopen("https://huggingface.co", timeout=5):
+        with urlopen("https://huggingface.co", timeout=3):
             return True
     except URLError:
         return False
