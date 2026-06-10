@@ -653,6 +653,7 @@ class torchTextClassifiers:
         top_k=1,
         explain_with_label_attention: bool = False,
         explain_with_captum=False,
+        device='cpu'
     ):
         """
         Args:
@@ -698,8 +699,7 @@ class torchTextClassifiers:
         text = X_test["text"]
         categorical_variables = X_test["categorical_variables"]
 
-        self.pytorch_model.eval()
-        device = next(self.pytorch_model.parameters()).device
+        self.pytorch_model.eval().to(device)
 
         tokenize_output = self.tokenizer.tokenize(
             text.tolist(),
