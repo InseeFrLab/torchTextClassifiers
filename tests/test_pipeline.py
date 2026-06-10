@@ -2,6 +2,8 @@ import numpy as np
 import pytest
 import torch
 from sklearn.preprocessing import LabelEncoder
+from urllib.error import URLError
+from urllib.request import urlopen
 
 from torchTextClassifiers import ModelConfig, TrainingConfig, torchTextClassifiers
 from torchTextClassifiers.dataset import TextClassificationDataset
@@ -30,6 +32,14 @@ from torchTextClassifiers.utilities.plot_explainability import (
     plot_attributions_at_char,
     plot_attributions_at_word,
 )
+
+
+def _is_huggingface_reachable() -> bool:
+    try:
+        with urlopen("https://huggingface.co", timeout=5):
+            return True
+    except URLError:
+        return False
 
 
 @pytest.fixture
@@ -291,6 +301,9 @@ def test_wordpiece_tokenizer(sample_data, model_params):
 def test_huggingface_tokenizer(sample_data, model_params):
     """Test the full pipeline with HuggingFaceTokenizer."""
     sample_text_data, categorical_data, labels = sample_data
+
+    if not _is_huggingface_reachable():
+        pytest.skip("Hugging Face is unreachable in this environment")
 
     tokenizer = HuggingFaceTokenizer.load_from_pretrained(
         "google-bert/bert-base-uncased", output_dim=50
