@@ -653,6 +653,7 @@ class torchTextClassifiers:
         top_k=1,
         explain_with_label_attention: bool = False,
         explain_with_captum=False,
+        device='cpu'
     ):
         """
         Args:
@@ -698,7 +699,7 @@ class torchTextClassifiers:
         text = X_test["text"]
         categorical_variables = X_test["categorical_variables"]
 
-        self.pytorch_model.eval().cpu()
+        self.pytorch_model.eval().to(device)
 
         tokenize_output = self.tokenizer.tokenize(
             text.tolist(),
@@ -711,15 +712,17 @@ class torchTextClassifiers:
                 f"Expected TokenizerOutput, got {type(tokenize_output)} from tokenizer.tokenize method."
             )
 
-        encoded_text = tokenize_output.input_ids  # (batch_size, seq_len)
-        attention_mask = tokenize_output.attention_mask  # (batch_size, seq_len)
+        encoded_text = tokenize_output.input_ids.to(device)  # (batch_size, seq_len)
+        attention_mask = tokenize_output.attention_mask.to(device)  # (batch_size, seq_len)
 
         if categorical_variables is not None:
             categorical_vars = torch.tensor(
-                categorical_variables, dtype=torch.float32
+                categorical_variables, dtype=torch.float32, device=device
             )  # (batch_size, num_categorical_features)
         else:
-            categorical_vars = torch.empty((encoded_text.shape[0], 0), dtype=torch.float32)
+            categorical_vars = torch.empty(
+                (encoded_text.shape[0], 0), dtype=torch.float32, device=device
+            )
 
         model_output = self.pytorch_model(
             encoded_text,
