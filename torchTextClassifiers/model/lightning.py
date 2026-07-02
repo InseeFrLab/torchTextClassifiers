@@ -1,7 +1,12 @@
+import inspect
+import logging
+
 import pytorch_lightning as pl
 import torch
 from torch import nn
 from torchmetrics import Accuracy
+
+logger = logging.getLogger(__name__)
 
 # ============================================================================
 # PyTorch Lightning Module
@@ -39,6 +44,17 @@ class TextClassificationModule(pl.LightningModule):
 
         self.model = model
         self.loss = loss
+
+        self._loss_accepts_sample_weights = "sample_weights" in inspect.signature(
+            self.loss.forward
+        ).parameters
+        if not self._loss_accepts_sample_weights and hasattr(self.loss, "reduction"):
+            if self.loss.reduction != "none":
+                logger.info(
+                    f"Setting reduction='none' on {type(self.loss).__name__} so that "
+                    "sample_weights can be applied per-sample before averaging."
+                )
+                self.loss.reduction = "none"
 
         if not hasattr(self.model, "num_classes") or self.model.num_classes is None:
             raise ValueError("Model must have num_classes attribute for accuracy calculation.")
@@ -78,7 +94,19 @@ class TextClassificationModule(pl.LightningModule):
         outputs = self.forward(batch)
         if isinstance(self.loss, torch.nn.BCEWithLogitsLoss):
             targets = targets.float()
-        loss = self.loss(outputs, targets)
+
+        sample_weights = batch.get("sample_weights")
+        if sample_weights is None:
+            sample_weights = torch.ones(targets.shape[0], device=targets.device)
+        sample_weights = sample_weights.to(targets.device)
+
+        if self._loss_accepts_sample_weights:
+            loss = self.loss(outputs, targets, sample_weights=sample_weights)
+        else:
+            per_sample_loss = self.loss(outputs, targets)
+            per_sample_loss = per_sample_loss.reshape(per_sample_loss.size(0), -1).mean(dim=1)
+            loss = (per_sample_loss * sample_weights).sum() / sample_weights.sum()
+
         if self.multilevel_accuracy:
             accuracy = [
                 fn(out, targets[:, i]) for i, (fn, out) in enumerate(zip(self.accuracy_fn, outputs))
