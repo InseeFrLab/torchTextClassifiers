@@ -145,34 +145,57 @@ class TestLightningModuleSampleWeights:
         assert torch.allclose(loss_with_zero, loss_excluded, atol=1e-6)
 
 
-class TestMultiLevelCrossEntropyLossSampleWeights:
-    def test_weighted_matches_manual_computation(self):
+class TestMultiLevelCrossEntropyLoss:
+    def test_returns_per_sample_tensor(self):
+        torch.manual_seed(0)
+        outputs = [torch.randn(4, 3), torch.randn(4, 2)]
+        labels = torch.stack([torch.tensor([0, 1, 2, 1]), torch.tensor([0, 1, 0, 1])], dim=1)
+
+        loss_fn = MultiLevelCrossEntropyLoss()
+        assert loss_fn.reduction == "none"
+
+        per_sample = loss_fn(outputs, labels)
+        assert per_sample.shape == (4,)
+
+        per_level_losses = [
+            torch.nn.functional.cross_entropy(out, labels[:, i], reduction="none")
+            for i, out in enumerate(outputs)
+        ]
+        expected = sum(per_level_losses) / len(outputs)
+        assert torch.allclose(per_sample, expected, atol=1e-6)
+
+    def test_step_applies_sample_weights_across_levels(self):
         torch.manual_seed(0)
         outputs = [torch.randn(4, 3), torch.randn(4, 2)]
         labels = torch.stack([torch.tensor([0, 1, 2, 1]), torch.tensor([0, 1, 0, 1])], dim=1)
         weights = torch.tensor([1.0, 0.0, 2.0, 1.0])
 
-        loss_fn = MultiLevelCrossEntropyLoss()
-        loss = loss_fn(outputs, labels, sample_weights=weights)
+        model = DummyClassificationModel(num_classes=[3, 2])
+        module = TextClassificationModule(
+            model=model,
+            loss=MultiLevelCrossEntropyLoss(),
+            optimizer=torch.optim.Adam,
+            optimizer_params={"lr": 1e-3},
+            scheduler=None,
+            scheduler_params=None,
+        )
+        batch = {
+            "input_ids": outputs,
+            "attention_mask": None,
+            "categorical_vars": None,
+            "labels": labels,
+            "sample_weights": weights,
+        }
+        loss, _ = module.step(batch)
 
-        per_level_losses = []
-        for i, out in enumerate(outputs):
-            per_sample = torch.nn.functional.cross_entropy(out, labels[:, i], reduction="none")
-            per_level_losses.append((per_sample * weights).sum() / weights.sum())
-        expected = sum(per_level_losses) / len(outputs)
+        per_level_losses = [
+            torch.nn.functional.cross_entropy(out, labels[:, i], reduction="none")
+            for i, out in enumerate(outputs)
+        ]
+        per_sample = sum(per_level_losses) / len(outputs)
+        expected = (per_sample * weights).sum() / weights.sum()
 
         assert torch.allclose(loss, expected, atol=1e-6)
-
-    def test_none_sample_weights_matches_unweighted(self):
-        torch.manual_seed(0)
-        outputs = [torch.randn(4, 3)]
-        labels = torch.tensor([0, 1, 2, 1]).unsqueeze(1)
-
-        loss_fn = MultiLevelCrossEntropyLoss()
-        weighted = loss_fn(outputs, labels)
-        expected = torch.nn.functional.cross_entropy(outputs[0], labels[:, 0])
-
-        assert torch.allclose(weighted, expected, atol=1e-6)
 
 
 class TestWrapperSampleWeightsValidation:

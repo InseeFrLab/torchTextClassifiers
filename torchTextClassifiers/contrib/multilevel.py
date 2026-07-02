@@ -167,37 +167,29 @@ class MultiLevelCrossEntropyLoss(nn.Module):
     def __init__(self, num_classes: Optional[list[int]] = None):
         super().__init__()
         self.num_classes = num_classes
+        self.reduction = "none"
         self.loss_fn = nn.CrossEntropyLoss(reduction="none")
 
-    def forward(
-        self,
-        outputs: list[torch.Tensor],
-        labels: torch.Tensor,
-        sample_weights: Optional[torch.Tensor] = None,
-    ) -> torch.Tensor:
-        """Compute the weighted average loss.
+    def forward(self, outputs: list[torch.Tensor], labels: torch.Tensor) -> torch.Tensor:
+        """Compute the per-sample weighted-average loss across levels.
+
+        Behaves like a ``reduction="none"`` loss: ``TextClassificationModule``
+        applies ``sample_weights`` and reduces the batch itself.
 
         Args:
             outputs: List of logit tensors ``(batch, num_classes_i)`` returned
                 by ``MultiLevelTextClassificationModel``.
             labels: Integer label tensor of shape ``(batch, n_levels)``.
                 Column ``i`` contains the ground-truth label for level ``i``.
-            sample_weights: Optional per-sample weight tensor of shape
-                ``(batch,)``. If ``None``, all samples are weighted equally.
 
         Returns:
-            Scalar loss tensor.
+            Per-sample loss tensor of shape ``(batch,)``.
         """
-        if sample_weights is None:
-            sample_weights = torch.ones(outputs[0].shape[0], device=outputs[0].device)
-
-        total_loss = torch.tensor(0.0, device=outputs[0].device)
+        total_loss = torch.zeros(outputs[0].shape[0], device=outputs[0].device)
         for idx, output in enumerate(outputs):
             label = labels[:, idx]
             weight = self.num_classes[idx] if self.num_classes is not None else 1
-            per_sample_loss = self.loss_fn(output.squeeze(), label)
-            level_loss = (per_sample_loss * sample_weights).sum() / sample_weights.sum()
-            total_loss = total_loss + level_loss * weight
+            total_loss = total_loss + self.loss_fn(output.squeeze(), label) * weight
 
         total_weight = sum(self.num_classes) if self.num_classes is not None else len(outputs)
         return total_loss / total_weight

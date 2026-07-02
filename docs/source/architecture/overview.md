@@ -611,9 +611,11 @@ This composes naturally with a loss's own per-*class* `weight=` argument (e.g.
 per-sample loss already reflects the class weight, and `sample_weights` is
 applied on top of it.
 
-**Custom losses** (used via `from_model`, see below) can opt in by adding an
-optional `sample_weights` keyword argument to `forward`, e.g.
-`forward(self, outputs, labels, sample_weights=None)` — `MultiLevelCrossEntropyLoss`
+**Custom losses** (used via `from_model`, see below) support this the same
+way standard PyTorch losses do: `forward` should return an **unreduced,
+per-sample** tensor of shape `(batch,)` (i.e. behave like
+`reduction="none"`), and `TextClassificationModule` takes care of applying
+`sample_weights` and reducing the batch itself — `MultiLevelCrossEntropyLoss`
 in `torchTextClassifiers.contrib` is a working example.
 
 ## Using the High-Level API

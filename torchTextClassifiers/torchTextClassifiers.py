@@ -281,17 +281,18 @@ class torchTextClassifiers:
            The wrapper reads ``categorical_variable_net.categorical_vocabulary_sizes``
            to set up the data pipeline.
 
-        **Optional: ``sample_weights`` support in a custom loss** — to support
-        per-sample loss weighting (see ``torchTextClassifiers.train``'s
-        ``sample_weights``/``val_sample_weights`` arguments) with a custom
-        multi-task loss, add an optional ``sample_weights`` keyword argument to
-        its ``forward`` method, e.g. ``forward(self, outputs, labels,
-        sample_weights=None)``, and use it to compute a weighted average
-        instead of a plain mean (see ``MultiLevelCrossEntropyLoss`` below for
-        an example). If your loss exposes a ``reduction`` attribute instead
-        (like standard ``torch.nn.*Loss`` classes) it will automatically be
-        switched to ``"none"`` so that the wrapper can apply the weights and
-        reduce the loss itself.
+        **``sample_weights`` support in a custom loss** — per-sample loss
+        weighting (see ``torchTextClassifiers.train``'s
+        ``sample_weights``/``val_sample_weights`` arguments) is applied by
+        ``TextClassificationModule`` itself, outside of your loss. Your loss's
+        ``forward`` just needs to return an **unreduced, per-sample** tensor
+        of shape ``(batch,)`` — exactly like a standard ``torch.nn.*Loss``
+        constructed with ``reduction="none"`` — instead of a single scalar.
+        If your loss exposes a ``reduction`` attribute (like standard
+        ``torch.nn.*Loss`` classes) it is automatically switched to
+        ``"none"``; if not (as for custom multi-task losses), simply make it
+        return the per-sample tensor directly (see
+        ``MultiLevelCrossEntropyLoss`` below for an example).
 
         See ``torchTextClassifiers.contrib`` for ready-made example architectures
         (``MultiLevelTextClassificationModel``, ``MultiLevelCrossEntropyLoss``) that
