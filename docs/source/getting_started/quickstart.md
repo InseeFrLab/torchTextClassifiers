@@ -237,6 +237,33 @@ classifier.train(
 )
 ```
 
+## Weighting Samples in the Loss
+
+If some training examples should count more than others (e.g. to rebalance
+classes or reflect label confidence), pass a `sample_weights` array to
+`train()` — one weight per training sample, defaulting to `1` (no weighting)
+when omitted. A separate `val_sample_weights` array can be passed for the
+validation set:
+
+```python
+import numpy as np
+
+sample_weights = np.ones(len(X_train))
+sample_weights[y_train == 0] = 2.0  # weight the minority class more heavily
+
+classifier.train(
+    X_train=X_train,
+    y_train=y_train,
+    X_val=X_val,
+    y_val=y_val,
+    sample_weights=sample_weights,
+    training_config=training_config,
+)
+```
+
+See {doc}`../architecture/overview` for details on how the weights flow through
+the dataset, batching, and loss computation.
+
 ## What's Next?
 
 Now that you've built your first classifier, you can:

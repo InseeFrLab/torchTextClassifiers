@@ -569,6 +569,53 @@ class CustomClassifier(nn.Module):
         return self.head(custom_features)
 ```
 
+## Weighting Individual Samples in the Loss (`sample_weights`)
+
+**Purpose:** Make some training (or validation) examples count more than others
+when the loss is computed — useful for class rebalancing, samples with uncertain
+labels, or business-driven importance weighting.
+
+`torchTextClassifiers.train()` accepts an optional `sample_weights` array (one
+weight per training example) and a separate `val_sample_weights` array (one
+weight per validation example). Both default to `1` for every sample, which is
+equivalent to not weighting at all.
+
+```python
+import numpy as np
+
+# Give recent/high-confidence samples more weight, e.g. 2x the default
+sample_weights = np.ones(len(X_train))
+sample_weights[recent_samples_mask] = 2.0
+
+classifier.train(
+    X_train, y_train,
+    training_config=training_config,
+    X_val=X_val, y_val=y_val,
+    sample_weights=sample_weights,          # shape (len(X_train),)
+    val_sample_weights=None,                # validation stays unweighted here
+)
+```
+
+**How it flows through the pipeline:**
+1. `TextClassificationDataset` stores the weights and returns one per sample
+   alongside the tokenized text, categorical variables, and label.
+2. The collate function stacks them into a `sample_weights` tensor on the batch.
+3. `TextClassificationModule` reads `batch["sample_weights"]` and computes a
+   **weighted average loss** instead of a plain mean: standard `torch.nn.*Loss`
+   objects (e.g. `CrossEntropyLoss`, `BCEWithLogitsLoss`) are automatically
+   switched to `reduction="none"` internally so each sample's loss can be
+   scaled by its weight before averaging.
+
+This composes naturally with a loss's own per-*class* `weight=` argument (e.g.
+`torch.nn.CrossEntropyLoss(weight=class_weights)` for class imbalance) — the
+per-sample loss already reflects the class weight, and `sample_weights` is
+applied on top of it.
+
+**Custom losses** (used via `from_model`, see below) can opt in by adding an
+optional `sample_weights` keyword argument to `forward`, e.g.
+`forward(self, outputs, labels, sample_weights=None)` — `MultiLevelCrossEntropyLoss`
+in `torchTextClassifiers.contrib` is a working example.
+
 ## Using the High-Level API
 
 For most users, the `torchTextClassifiers` wrapper handles all the complexity:
