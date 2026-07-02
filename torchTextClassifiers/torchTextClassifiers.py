@@ -281,6 +281,18 @@ class torchTextClassifiers:
            The wrapper reads ``categorical_variable_net.categorical_vocabulary_sizes``
            to set up the data pipeline.
 
+        **Optional: ``sample_weights`` support in a custom loss** — to support
+        per-sample loss weighting (see ``torchTextClassifiers.train``'s
+        ``sample_weights``/``val_sample_weights`` arguments) with a custom
+        multi-task loss, add an optional ``sample_weights`` keyword argument to
+        its ``forward`` method, e.g. ``forward(self, outputs, labels,
+        sample_weights=None)``, and use it to compute a weighted average
+        instead of a plain mean (see ``MultiLevelCrossEntropyLoss`` below for
+        an example). If your loss exposes a ``reduction`` attribute instead
+        (like standard ``torch.nn.*Loss`` classes) it will automatically be
+        switched to ``"none"`` so that the wrapper can apply the weights and
+        reduce the loss itself.
+
         See ``torchTextClassifiers.contrib`` for ready-made example architectures
         (``MultiLevelTextClassificationModel``, ``MultiLevelCrossEntropyLoss``) that
         follow this interface.
@@ -323,6 +335,8 @@ class torchTextClassifiers:
         training_config: TrainingConfig,
         X_val: Optional[np.ndarray] = None,
         y_val: Optional[np.ndarray] = None,
+        sample_weights: Optional[np.ndarray] = None,
+        val_sample_weights: Optional[np.ndarray] = None,
         verbose: bool = False,
     ) -> None:
         """Train the classifier using PyTorch Lightning.
@@ -346,6 +360,12 @@ class torchTextClassifiers:
             X_val: Validation input data
             y_val: Validation labels
             training_config: Configuration parameters for training
+            sample_weights: Optional per-sample weights for the training loss,
+                as a 1D array of length ``len(X_train)``. Defaults to 1 for
+                every sample (i.e. no weighting) when not provided.
+            val_sample_weights: Optional per-sample weights for the
+                validation loss, as a 1D array of length ``len(X_val)``.
+                Defaults to 1 for every sample when not provided.
             verbose: Whether to print training progress information
 
 
@@ -369,6 +389,7 @@ class torchTextClassifiers:
         X_train, y_train = self._check_XY(
             X_train, y_train, training_config.raw_categorical_inputs, training_config.raw_labels
         )
+        sample_weights = self._check_sample_weights(sample_weights, X_train["text"].shape[0])
 
         if X_val is not None:
             assert y_val is not None, "y_val must be provided if X_val is provided."
@@ -378,6 +399,9 @@ class torchTextClassifiers:
         X_val_checked: Optional[Dict[str, Any]] = None
         if X_val is not None and y_val is not None:
             X_val_checked, y_val = self._check_XY(X_val, y_val, training_config.raw_categorical_inputs, training_config.raw_labels)
+            val_sample_weights = self._check_sample_weights(
+                val_sample_weights, X_val_checked["text"].shape[0]
+            )
         X_val = X_val_checked
 
         if (
@@ -434,6 +458,7 @@ class torchTextClassifiers:
             tokenizer=self.tokenizer,
             labels=y_train.tolist(),
             ragged_multilabel=self.ragged_multilabel,
+            sample_weights=sample_weights,
         )
         train_dataloader = train_dataset.create_dataloader(
             batch_size=training_config.batch_size,
@@ -449,6 +474,7 @@ class torchTextClassifiers:
                 tokenizer=self.tokenizer,
                 labels=y_val,
                 ragged_multilabel=self.ragged_multilabel,
+                sample_weights=val_sample_weights,
             )
             val_dataloader = val_dataset.create_dataloader(
                 batch_size=training_config.batch_size,
@@ -530,6 +556,24 @@ class torchTextClassifiers:
             raise ValueError("X_train and y_train must have the same number of observations.")
 
         return X_checked, Y_checked
+
+    @staticmethod
+    def _check_sample_weights(
+        sample_weights: Optional[np.ndarray], n_samples: int
+    ) -> Optional[np.ndarray]:
+        if sample_weights is None:
+            return None
+
+        sample_weights = np.asarray(sample_weights, dtype=np.float32)
+        assert sample_weights.ndim == 1, "sample_weights must be a 1D array."
+        if sample_weights.shape[0] != n_samples:
+            raise ValueError(
+                f"sample_weights must have length {n_samples} (one weight per sample), "
+                f"got {sample_weights.shape[0]}."
+            )
+        assert (sample_weights >= 0).all(), "sample_weights must be non-negative."
+
+        return sample_weights
 
     @staticmethod
     def _check_text_col(X):
