@@ -20,8 +20,15 @@ class TextClassificationDataset(Dataset):
         tokenizer: BaseTokenizer,
         labels: Union[List[int], List[List[int]], np.array, None] = None,
         ragged_multilabel: bool = False,
+        sample_weights: Union[List[float], np.ndarray, None] = None,
     ):
         self.categorical_variables = categorical_variables
+
+        self.sample_weights = (
+            torch.tensor(sample_weights, dtype=torch.float32)
+            if sample_weights is not None
+            else None
+        )
 
         self.texts = texts
 
@@ -59,6 +66,7 @@ class TextClassificationDataset(Dataset):
         return len(self.texts)
 
     def __getitem__(self, idx):
+        weight = self.sample_weights[idx] if self.sample_weights is not None else 1.0
         if self.labels is not None:
             return (
                 str(self.texts[idx]),
@@ -68,6 +76,7 @@ class TextClassificationDataset(Dataset):
                     else None
                 ),
                 self.labels[idx],
+                weight,
             )
         else:
             return (
@@ -78,10 +87,11 @@ class TextClassificationDataset(Dataset):
                     else None
                 ),
                 None,
+                weight,
             )
 
     def collate_fn(self, batch):
-        text, *categorical_vars, labels = zip(*batch)
+        text, *categorical_vars, labels, weights = zip(*batch)
 
         if self.labels is not None:
             if self.ragged_multilabel:
@@ -120,11 +130,14 @@ class TextClassificationDataset(Dataset):
         else:
             categorical_tensors = None
 
+        weights_tensor = torch.tensor([float(w) for w in weights], dtype=torch.float32)
+
         return {
             "input_ids": tokenize_output.input_ids,
             "attention_mask": tokenize_output.attention_mask,
             "categorical_vars": categorical_tensors,
             "labels": labels_tensor,
+            "sample_weights": weights_tensor,
         }
 
     def create_dataloader(
