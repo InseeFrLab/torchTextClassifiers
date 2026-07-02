@@ -1,4 +1,3 @@
-import inspect
 import logging
 
 import pytorch_lightning as pl
@@ -45,16 +44,12 @@ class TextClassificationModule(pl.LightningModule):
         self.model = model
         self.loss = loss
 
-        self._loss_accepts_sample_weights = "sample_weights" in inspect.signature(
-            self.loss.forward
-        ).parameters
-        if not self._loss_accepts_sample_weights and hasattr(self.loss, "reduction"):
-            if self.loss.reduction != "none":
-                logger.info(
-                    f"Setting reduction='none' on {type(self.loss).__name__} so that "
-                    "sample_weights can be applied per-sample before averaging."
-                )
-                self.loss.reduction = "none"
+        if hasattr(self.loss, "reduction") and self.loss.reduction != "none":
+            logger.info(
+                f"Setting reduction='none' on {type(self.loss).__name__} so that "
+                "sample_weights can be applied per-sample before averaging."
+            )
+            self.loss.reduction = "none"
 
         if not hasattr(self.model, "num_classes") or self.model.num_classes is None:
             raise ValueError("Model must have num_classes attribute for accuracy calculation.")
@@ -100,12 +95,9 @@ class TextClassificationModule(pl.LightningModule):
             sample_weights = torch.ones(targets.shape[0], device=targets.device)
         sample_weights = sample_weights.to(targets.device)
 
-        if self._loss_accepts_sample_weights:
-            loss = self.loss(outputs, targets, sample_weights=sample_weights)
-        else:
-            per_sample_loss = self.loss(outputs, targets)
-            per_sample_loss = per_sample_loss.reshape(per_sample_loss.size(0), -1).mean(dim=1)
-            loss = (per_sample_loss * sample_weights).sum() / sample_weights.sum()
+        per_sample_loss = self.loss(outputs, targets)
+        per_sample_loss = per_sample_loss.reshape(per_sample_loss.size(0), -1).mean(dim=1)
+        loss = (per_sample_loss * sample_weights).sum() / sample_weights.sum()
 
         if self.multilevel_accuracy:
             accuracy = [
