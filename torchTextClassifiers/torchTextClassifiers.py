@@ -708,7 +708,7 @@ class torchTextClassifiers:
             explain_with_captum (bool): launch gradient integration with Captum for explanation (default: False)
 
         Returns: A dictionary containing the following fields:
-                - predictions (torch.Tensor, shape (len(text), top_k)): A tensor containing the top_k most likely codes to the query.
+                - prediction (torch.Tensor, shape (len(text), top_k)): A tensor containing the top_k most likely codes to the query.
                 - confidence (torch.Tensor, shape (len(text), top_k)): A tensor array containing the corresponding confidence scores.
                 - if explain is True:
                     - attributions (torch.Tensor, shape (len(text), top_k, seq_len)): A tensor containing the attributions for each token in the text.
