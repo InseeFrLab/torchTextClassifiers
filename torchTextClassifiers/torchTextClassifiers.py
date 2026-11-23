@@ -769,12 +769,16 @@ class torchTextClassifiers:
                 (encoded_text.shape[0], 0), dtype=torch.float32, device=device
             )
 
-        model_output = self.pytorch_model(
-            encoded_text,
-            attention_mask,
-            categorical_vars,
-            return_label_attention_matrix=explain_with_label_attention,
-        )  # forward pass, contains the prediction scores (len(text), num_classes)
+        # Inference only: no need to build the autograd graph (saves memory and time).
+        # Captum attributions below are computed outside this block, and Captum
+        # re-enables gradients internally for its own forward/backward passes.
+        with torch.no_grad():
+            model_output = self.pytorch_model(
+                encoded_text,
+                attention_mask,
+                categorical_vars,
+                return_label_attention_matrix=explain_with_label_attention,
+            )  # forward pass, contains the prediction scores (len(text), num_classes)
 
         # Multilevel custom model: returns a list of per-level logit tensors.
         # Each level may have a different number of classes, so we process them
@@ -827,10 +831,13 @@ class torchTextClassifiers:
                 # Captum explanations
                 captum_attributions = []
                 for k in range(top_k):
-                    attributions = lig.attribute(
-                        (encoded_text, attention_mask, categorical_vars),
-                        target=integer_predictions[:, k].to(device),
-                    )  # (batch_size, seq_len)
+                    # Integrated gradients need autograd: enable it explicitly, even if
+                    # predict() is called from within a user-level torch.no_grad() context.
+                    with torch.enable_grad():
+                        attributions = lig.attribute(
+                            (encoded_text, attention_mask, categorical_vars),
+                            target=integer_predictions[:, k].to(device),
+                        )  # (batch_size, seq_len)
                     attributions = attributions.sum(dim=-1)
                     captum_attributions.append(attributions.detach().cpu())
 
