@@ -80,7 +80,8 @@ class TrainingConfig:
     optimizer: Type[torch.optim.Optimizer] = torch.optim.Adam
     scheduler: Optional[Type[torch.optim.lr_scheduler._LRScheduler]] = None
     accelerator: str = "auto"
-    num_workers: int = 12
+    # None: available CPUs (cgroup quota / affinity aware) - 1, capped at 8
+    num_workers: Optional[int] = None
     patience_early_stopping: int = 3
     dataloader_params: Optional[dict] = None
     trainer_params: Optional[dict] = None

@@ -125,9 +125,11 @@ Configuration for training process.
       Accelerator type: "auto", "cpu", "gpu", or "mps" (default: "auto").
 
    .. attribute:: num_workers
-      :type: int
+      :type: Optional[int]
 
-      Number of data loading workers (default: 12).
+      Number of data loading workers. Default (``None``): number of CPUs actually
+      available to the process minus one (taking cgroup CPU quotas and CPU affinity
+      into account, so containers are sized correctly), capped at 8.
 
    .. attribute:: patience_early_stopping
       :type: int
