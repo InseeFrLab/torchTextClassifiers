@@ -26,6 +26,9 @@ Main Class
       ~torchTextClassifiers.get_explanations
       ~torchTextClassifiers.save
       ~torchTextClassifiers.load
+      ~torchTextClassifiers.save_pretrained
+      ~torchTextClassifiers.from_pretrained
+      ~torchTextClassifiers.push_to_hub
 
 Usage Example
 -------------
@@ -50,6 +53,20 @@ Usage Example
    # Make predictions
    predictions = classifier.predict(new_texts)
    probabilities = classifier.predict_proba(new_texts)
+
+Hugging Face Hub
+----------------
+
+With the ``hub`` extra (``pip install "torchTextClassifiers[hub]"``), a classifier can be saved
+and shared using ``save_pretrained``, ``from_pretrained`` and ``push_to_hub``. Files are written
+as ``model.safetensors`` plus JSON (no pickle). Currently only models built from a
+``ModelConfig`` with an ``NGramTokenizer`` are supported. See :doc:`../tutorials/hub_sharing`.
+
+.. code-block:: python
+
+   classifier.save_pretrained("my_model/")
+   classifier.push_to_hub("my-org/my-model", model_card_kwargs={"license": "mit"})
+   classifier = torchTextClassifiers.from_pretrained("my-org/my-model")
 
 See Also
 --------
