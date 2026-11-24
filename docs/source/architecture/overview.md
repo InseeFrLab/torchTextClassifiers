@@ -44,6 +44,11 @@ cat_encoder = LabelEncoder().fit(X_train_categories)
 # Option B: explicit dict mapping
 cat_encoder = DictEncoder({"Electronics": 0, "Audio": 1, "Books": 2})
 
+# Option C: sklearn OrdinalEncoder (categorical features only, not labels;
+# expects a 2D input, hence the reshape)
+from sklearn.preprocessing import OrdinalEncoder
+cat_encoder = OrdinalEncoder().fit(X_train_categories.reshape(-1, 1))
+
 value_encoder = ValueEncoder(
     label_encoder=LabelEncoder().fit(y_train),   # encodes/decodes labels
     categorical_encoders={
@@ -52,6 +57,25 @@ value_encoder = ValueEncoder(
     },
 )
 ```
+
+### Handling Unknown Categorical Values
+
+By default, a categorical value not seen when the encoder was fitted raises a
+`ValueError`. Pass `handle_unknown=True` to map unknown (or missing) values to an extra
+"unknown" index instead, equal to the number of known categories of that feature:
+
+```python
+value_encoder = ValueEncoder(
+    label_encoder=LabelEncoder().fit(y_train),
+    categorical_encoders={"category": cat_encoder},
+    handle_unknown=True,
+)
+
+value_encoder.vocabulary_sizes   # [4]  – 3 known categories + 1 unknown slot
+```
+
+`vocabulary_sizes` includes the extra slot, so the embedding layer automatically gets a
+row for it. This option applies to categorical features only; labels are unaffected.
 
 ### What It Provides
 
