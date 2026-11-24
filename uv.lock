@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.12'",
@@ -250,7 +250,7 @@ name = "cffi"
 version = "2.0.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pycparser", marker = "implementation_name != 'PyPy'" },
+    { name = "pycparser" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/eb/56/b1ba7935a17738ae8453301356628e8147c79dbb825bcbc73dc7401f9846/cffi-2.0.0.tar.gz", hash = "sha256:44d1b5909021139fe36001ae048dbdde8214afa20200eda0f64c068cac5d5529", size = 523588, upload-time = "2025-09-08T23:24:04.541Z" }
 wheels = [
@@ -3252,6 +3252,10 @@ explainability = [
     { name = "nltk" },
     { name = "unidecode" },
 ]
+hub = [
+    { name = "huggingface-hub" },
+    { name = "safetensors" },
+]
 huggingface = [
     { name = "datasets" },
     { name = "tokenizers" },
@@ -3265,6 +3269,7 @@ preprocess = [
 [package.dev-dependencies]
 dev = [
     { name = "captum" },
+    { name = "huggingface-hub" },
     { name = "ipywidgets" },
     { name = "nltk" },
     { name = "pandas" },
@@ -3272,6 +3277,7 @@ dev = [
     { name = "pyarrow" },
     { name = "pytest" },
     { name = "ruff" },
+    { name = "safetensors" },
     { name = "scikit-learn" },
     { name = "unidecode" },
 ]
@@ -3293,20 +3299,23 @@ docs = [
 requires-dist = [
     { name = "captum", marker = "extra == 'explainability'" },
     { name = "datasets", marker = "extra == 'huggingface'", specifier = ">=4.3.0" },
+    { name = "huggingface-hub", marker = "extra == 'hub'", specifier = ">=0.24" },
     { name = "nltk", marker = "extra == 'explainability'" },
     { name = "nltk", marker = "extra == 'preprocess'" },
     { name = "numpy", specifier = ">=1.26.4" },
     { name = "pytorch-lightning", specifier = ">=2.4.0" },
+    { name = "safetensors", marker = "extra == 'hub'" },
     { name = "tokenizers", marker = "extra == 'huggingface'", specifier = ">=0.22.1" },
     { name = "transformers", marker = "extra == 'huggingface'", specifier = ">=4.57.1" },
     { name = "unidecode", marker = "extra == 'explainability'" },
     { name = "unidecode", marker = "extra == 'preprocess'" },
 ]
-provides-extras = ["explainability", "preprocess", "huggingface"]
+provides-extras = ["explainability", "preprocess", "hub", "huggingface"]
 
 [package.metadata.requires-dev]
 dev = [
     { name = "captum" },
+    { name = "huggingface-hub", specifier = ">=0.24" },
     { name = "ipywidgets", specifier = ">=8.1.8" },
     { name = "nltk" },
     { name = "pandas" },
@@ -3314,6 +3323,7 @@ dev = [
     { name = "pyarrow" },
     { name = "pytest", specifier = ">=9.0.1,<10" },
     { name = "ruff", specifier = ">=0.14.3" },
+    { name = "safetensors" },
     { name = "scikit-learn" },
     { name = "unidecode" },
 ]
