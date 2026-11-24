@@ -217,6 +217,29 @@ X_train = np.column_stack([texts_train, categories_train])  # dtype=object is fi
 The `ValueEncoder` also exposes `.vocabulary_sizes` and `.num_classes` so you don't
 have to compute them manually for `ModelConfig`.
 
+sklearn's `OrdinalEncoder` is also supported for categorical features (not labels).
+It expects 2D input, so fit it on a reshaped column:
+
+```python
+from sklearn.preprocessing import OrdinalEncoder
+
+cat_encoder = OrdinalEncoder().fit(X_train_categories.reshape(-1, 1))
+```
+
+**Unknown categories at inference time.** By default, a category not seen during fitting
+raises a `ValueError`. Set `handle_unknown=True` to map unseen or missing values to an
+extra "unknown" embedding index instead:
+
+```python
+value_encoder = ValueEncoder(
+    label_encoder=LabelEncoder().fit(y_train),
+    categorical_encoders={"category": cat_encoder},
+    handle_unknown=True,
+)
+```
+
+`.vocabulary_sizes` then includes the extra slot (number of known categories + 1).
+
 #### Without ValueEncoder (manual encoding)
 
 If you prefer to manage encoding yourself, categorical features must be
