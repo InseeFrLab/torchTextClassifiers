@@ -1,12 +1,13 @@
 import logging
 import os
-from typing import List, Union
+from typing import List, Optional, Union
 
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, Dataset
 
 from torchTextClassifiers.tokenizers import BaseTokenizer
+from torchTextClassifiers.utilities.resources import default_num_workers
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 logger = logging.getLogger(__name__)
@@ -145,11 +146,16 @@ class TextClassificationDataset(Dataset):
         batch_size: int,
         shuffle: bool = False,
         drop_last: bool = False,
-        num_workers: int = os.cpu_count() - 1,
+        num_workers: Optional[int] = None,
         pin_memory: bool = False,
         persistent_workers: bool = True,
         **kwargs,
     ):
+        # None -> sized from the CPUs actually available (cgroup quota / affinity),
+        # not os.cpu_count(), which reports all host CPUs inside containers.
+        if num_workers is None:
+            num_workers = default_num_workers()
+
         # persistent_workers requires num_workers > 0
         if num_workers == 0:
             persistent_workers = False

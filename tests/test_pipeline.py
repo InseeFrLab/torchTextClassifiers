@@ -118,7 +118,7 @@ def run_full_pipeline(
         labels=None,
     )
 
-    dataloader = dataset.create_dataloader(batch_size=4)
+    dataloader = dataset.create_dataloader(batch_size=4, num_workers=0)
     batch = next(iter(dataloader))
 
     # Get tokenizer parameters
@@ -215,6 +215,7 @@ def run_full_pipeline(
         lr=1e-3,
         batch_size=4,
         num_epochs=1,
+        num_workers=0,
     )
 
     # Create classifier — pass the fitted value encoder
