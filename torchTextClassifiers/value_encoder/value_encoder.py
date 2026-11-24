@@ -1,7 +1,7 @@
 from typing import Optional
 
 import numpy as np
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import LabelEncoder, OrdinalEncoder
 
 
 class DictEncoder:
@@ -39,11 +39,17 @@ class ValueEncoder:
     Build encoders externally before passing them in:
     - DictEncoder: provide a ``{value: index}`` mapping directly.
     - sklearn LabelEncoder: call ``LabelEncoder().fit(column)`` per feature.
+    - sklearn OrdinalEncoder: call ``OrdinalEncoder().fit(column.reshape(-1, 1))`` per feature.
+      (Only for categorical features, not labels.)
 
     Initialization:
     - label_encoder: A DictEncoder or LabelEncoder instance for encoding labels.
-    - encoders (optional): A dictionary mapping feature names to DictEncoder or
-      LabelEncoder instances.
+    - categorical_encoders (optional): A dictionary mapping feature names to DictEncoder,
+      LabelEncoder or OrdinalEncoder instances.
+    - handle_unknown (default False): If True, categorical values not seen during fitting
+      (or missing values) are mapped to an extra "unknown" index, equal to the number of known
+      categories of the feature, instead of raising a ValueError. ``vocabulary_sizes`` then
+      includes this extra slot so the embedding layer has a row for it.
 
     Properties:
     - vocabulary_sizes: List of vocabulary sizes (number of unique values) for each feature.
@@ -57,9 +63,20 @@ class ValueEncoder:
     def __init__(
         self,
         label_encoder: DictEncoder | LabelEncoder | list[DictEncoder | LabelEncoder],
-        categorical_encoders: Optional[dict[str, DictEncoder | LabelEncoder]] = None,
+        categorical_encoders: Optional[
+            dict[str, DictEncoder | LabelEncoder | OrdinalEncoder]
+        ] = None,
+        handle_unknown: bool = False,
     ):
         self.categorical_encoders = categorical_encoders
+        self.handle_unknown = handle_unknown
+        if categorical_encoders is not None:
+            for name, enc in categorical_encoders.items():
+                if not isinstance(enc, (DictEncoder, LabelEncoder, OrdinalEncoder)):
+                    raise TypeError(
+                        f"Encoder for '{name}' must be a DictEncoder, LabelEncoder or "
+                        f"OrdinalEncoder, got {type(enc)}"
+                    )
 
         if isinstance(label_encoder, list):
             for enc in label_encoder:
@@ -84,13 +101,25 @@ class ValueEncoder:
         else:
             sizes = []
             for enc in self.categorical_encoders.values():
-                if isinstance(enc, DictEncoder):
-                    sizes.append(len(enc.mapping))
-                elif hasattr(enc, "classes_"):
-                    sizes.append(len(enc.classes_))
-                else:
-                    raise TypeError(f"Unsupported encoder type: {type(enc)}")
+                sizes.append(len(self._known_categories(enc)) + int(self.handle_unknown))
             return sizes
+
+    @staticmethod
+    def _known_categories(enc) -> np.ndarray:
+        if isinstance(enc, DictEncoder):
+            return np.array(list(enc.mapping.keys()))
+        elif isinstance(enc, OrdinalEncoder):
+            return np.asarray(enc.categories_[0])
+        elif hasattr(enc, "classes_"):
+            return np.asarray(enc.classes_)
+        raise TypeError(f"Unsupported encoder type: {type(enc)}")
+
+    @staticmethod
+    def _encode_known(enc, col: np.ndarray) -> np.ndarray:
+        """Encode a column that only contains known values."""
+        if isinstance(enc, OrdinalEncoder):
+            return enc.transform(col.reshape(-1, 1))[:, 0]
+        return np.asarray(enc.transform(col))
 
     @property
     def num_classes(self) -> int:
@@ -116,7 +145,8 @@ class ValueEncoder:
     def transform(self, X_categorical: np.ndarray) -> np.ndarray:
         """Encode all categorical columns to integer indices.
 
-        Values are converted to strings before lookup. Unknown values raise a ValueError.
+        Values are converted to strings before lookup. Unknown values raise a ValueError,
+        unless ``handle_unknown=True``, in which case they map to index ``vocabulary_size``.
 
         Args:
             X_categorical: Array of shape (N, n_features) with categorical values.
@@ -137,7 +167,24 @@ class ValueEncoder:
         result = np.empty(X_categorical.shape, dtype=np.int64)
         for idx, (name, encoder) in enumerate(self.categorical_encoders.items()):
             col = X_categorical[:, idx].astype(str)
-            encoded = encoder.transform(col)
+            if self.handle_unknown:
+                known = self._known_categories(encoder)
+                is_known = np.isin(col, known.astype(str))
+                unknown_index = len(known)
+                column = np.full(col.shape, unknown_index, dtype=np.int64)
+                if is_known.any():
+                    column[is_known] = self._encode_known(encoder, col[is_known]).astype(np.int64)
+                result[:, idx] = column
+                continue
+            if isinstance(encoder, OrdinalEncoder):
+                known = self._known_categories(encoder).astype(str)
+                unknown = sorted(set(col[~np.isin(col, known)].tolist()))
+                if unknown:
+                    raise ValueError(
+                        f"Unknown values in categorical feature '{name}': {unknown}. "
+                        "These values were not seen during fitting."
+                    )
+            encoded = self._encode_known(encoder, col)
             try:
                 result[:, idx] = encoded.astype(np.int64)
             except (TypeError, ValueError):
