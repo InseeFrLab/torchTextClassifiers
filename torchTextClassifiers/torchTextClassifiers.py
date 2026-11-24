@@ -23,6 +23,7 @@ from pytorch_lightning.callbacks import (
 )
 from torch import nn
 
+from torchTextClassifiers import hub as _hub
 from torchTextClassifiers.dataset import TextClassificationDataset
 from torchTextClassifiers.model import TextClassificationModel, TextClassificationModule
 from torchTextClassifiers.model.components import (
@@ -66,6 +67,10 @@ class ModelConfig:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ModelConfig":
+        data = dict(data)
+        # ``to_dict`` (dataclasses.asdict) flattens nested dataclasses into dicts
+        if isinstance(data.get("attention_config"), dict):
+            data["attention_config"] = AttentionConfig(**data["attention_config"])
         return cls(**data)
 
 
@@ -98,7 +103,13 @@ class TrainingConfig:
         return data
 
 
-class torchTextClassifiers:
+class torchTextClassifiers(
+    _hub.HubBase,
+    library_name=_hub.LIBRARY_NAME,
+    repo_url=_hub.REPO_URL,
+    docs_url=_hub.DOCS_URL,
+    tags=["text-classification", _hub.LIBRARY_NAME],
+):
     """Generic text classifier framework supporting multiple architectures.
 
     Given a tokenizer and model configuration, this class initializes:
@@ -400,7 +411,9 @@ class torchTextClassifiers:
 
         X_val_checked: Optional[Dict[str, Any]] = None
         if X_val is not None and y_val is not None:
-            X_val_checked, y_val = self._check_XY(X_val, y_val, training_config.raw_categorical_inputs, training_config.raw_labels)
+            X_val_checked, y_val = self._check_XY(
+                X_val, y_val, training_config.raw_categorical_inputs, training_config.raw_labels
+            )
             val_sample_weights = self._check_sample_weights(
                 val_sample_weights, X_val_checked["text"].shape[0]
             )
@@ -579,9 +592,9 @@ class torchTextClassifiers:
 
     @staticmethod
     def _check_text_col(X):
-        assert isinstance(
-            X, np.ndarray
-        ), "X must be a numpy array of shape (N,d), with the first column being the text and the rest being the categorical variables."
+        assert isinstance(X, np.ndarray), (
+            "X must be a numpy array of shape (N,d), with the first column being the text and the rest being the categorical variables."
+        )
 
         try:
             if X.ndim > 1:
@@ -654,9 +667,9 @@ class torchTextClassifiers:
 
     def _check_Y(self, Y, raw_labels: bool) -> np.ndarray:
         if self.ragged_multilabel:
-            assert isinstance(
-                Y, list
-            ), "Y must be a list of lists for ragged multilabel classification."
+            assert isinstance(Y, list), (
+                "Y must be a list of lists for ragged multilabel classification."
+            )
             for row in Y:
                 assert isinstance(row, list), "Each element of Y must be a list of labels."
 
@@ -664,9 +677,9 @@ class torchTextClassifiers:
 
         else:
             assert isinstance(Y, np.ndarray), "Y must be a numpy array of shape (N,) or (N,1)."
-            assert (
-                len(Y.shape) == 1 or len(Y.shape) == 2
-            ), "Y must be a numpy array of shape (N,) or (N, num_labels)."
+            assert len(Y.shape) == 1 or len(Y.shape) == 2, (
+                "Y must be a numpy array of shape (N,) or (N, num_labels)."
+            )
 
             if raw_labels:
                 if self.value_encoder is None:
@@ -699,7 +712,7 @@ class torchTextClassifiers:
         top_k=1,
         explain_with_label_attention: bool = False,
         explain_with_captum=False,
-        device='cpu'
+        device="cpu",
     ):
         """
         Args:
@@ -1016,6 +1029,132 @@ class torchTextClassifiers:
 
         logger.info(f"Model loaded successfully from {path}")
         return instance
+
+    # ------------------------------------------------------------------
+    # Hugging Face Hub integration (``pip install torchTextClassifiers[hub]``)
+    # ------------------------------------------------------------------
+
+    def _save_pretrained(self, save_directory: Path) -> None:
+        """Pickle-free serialization used by ``save_pretrained`` / ``push_to_hub``.
+
+        Writes ``model.safetensors``, ``config.json``, ``tokenizer/``, ``labels.json`` and
+        (if any) ``categorical.json``. Only models built from a ``ModelConfig`` are supported.
+        """
+        _hub.require_hub()
+        from safetensors.torch import save_model
+
+        if getattr(self, "_custom_model", False):
+            raise NotImplementedError(
+                "Hub serialization is not supported for custom models built with `from_model`."
+            )
+
+        save_directory = Path(save_directory)
+        save_directory.mkdir(parents=True, exist_ok=True)
+
+        tokenizer_type = _hub.save_tokenizer(self.tokenizer, save_directory / _hub.TOKENIZER_DIR)
+
+        save_model(self.pytorch_model.cpu().eval(), str(save_directory / _hub.WEIGHTS_FILE))
+        if hasattr(self, "device"):
+            self.pytorch_model.to(self.device)
+
+        config = {
+            "format_version": _hub.FORMAT_VERSION,
+            "library_name": _hub.LIBRARY_NAME,
+            "library_version": _hub.library_version(),
+            "task": "multilabel" if self.ragged_multilabel else "multiclass",
+            "ragged_multilabel": self.ragged_multilabel,
+            "num_classes": self.num_classes,
+            "model_config": self.model_config.to_dict(),
+            "tokenizer_type": tokenizer_type,
+            "has_value_encoder": self.value_encoder is not None,
+        }
+        _hub.write_json(save_directory / _hub.CONFIG_FILE, config)
+
+        if self.value_encoder is not None:
+            _hub.write_json(save_directory / _hub.LABELS_FILE, self.value_encoder.labels_to_dict())
+            categorical = self.value_encoder.categorical_to_dict()
+            if categorical is not None:
+                _hub.write_json(save_directory / _hub.CATEGORICAL_FILE, categorical)
+
+    @classmethod
+    def _from_pretrained(
+        cls,
+        *,
+        model_id: str,
+        revision: Optional[str] = None,
+        cache_dir: Optional[Union[str, Path]] = None,
+        force_download: bool = False,
+        local_files_only: bool = False,
+        token: Optional[Union[str, bool]] = None,
+        device: str = "auto",
+        strict: bool = True,
+        **model_kwargs,
+    ) -> "torchTextClassifiers":
+        """Rebuild an instance from a local directory or a Hub repo.
+
+        Args:
+            device: Device to load the model on ('auto', 'cpu', 'cuda', ...).
+            strict: Raise if the saved major library version differs from the installed one
+                (otherwise only warn).
+        """
+        _hub.require_hub()
+        from huggingface_hub import snapshot_download
+        from safetensors.torch import load_model
+
+        if Path(model_id).is_dir():
+            directory = Path(model_id)
+        else:
+            directory = Path(
+                snapshot_download(
+                    repo_id=model_id,
+                    revision=revision,
+                    cache_dir=cache_dir,
+                    force_download=force_download,
+                    local_files_only=local_files_only,
+                    token=token,
+                )
+            )
+
+        config = _hub.read_json(directory / _hub.CONFIG_FILE)
+        _hub.check_version(config.get("library_version"), strict=strict)
+
+        tokenizer = _hub.load_tokenizer(config["tokenizer_type"], directory / _hub.TOKENIZER_DIR)
+
+        value_encoder = None
+        if config.get("has_value_encoder"):
+            categorical_path = directory / _hub.CATEGORICAL_FILE
+            value_encoder = ValueEncoder.from_dicts(
+                _hub.read_json(directory / _hub.LABELS_FILE),
+                _hub.read_json(categorical_path) if categorical_path.exists() else None,
+            )
+
+        instance = cls(
+            tokenizer=tokenizer,
+            model_config=ModelConfig.from_dict(config["model_config"]),
+            ragged_multilabel=config["ragged_multilabel"],
+            value_encoder=value_encoder,
+        )
+
+        resolved_device = (
+            torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            if device == "auto"
+            else torch.device(device)
+        )
+        load_model(instance.pytorch_model, str(directory / _hub.WEIGHTS_FILE))
+        instance.pytorch_model.to(resolved_device).eval()
+        instance.device = resolved_device
+        return instance
+
+    def generate_model_card(self, *args, **kwargs):
+        """Generate the model card.
+
+        Pass extra fields through ``push_to_hub(..., model_card_kwargs={...})``. Supported keys:
+        ``license``, ``language``, ``datasets`` (list of dataset ids), ``metrics``
+        (``{name: value}``, reported against ``datasets[0]``), ``dataset_revision``,
+        ``training_code_commit``, ``model_name``, ``tags``; any other key is listed as a
+        bullet in the card body.
+        """
+        return _hub.build_model_card(self, **kwargs)
 
     def __repr__(self):
         model_type = (

@@ -243,3 +243,58 @@ class ValueEncoder:
 
     def __call__(self, array: np.ndarray) -> np.ndarray:
         return self.transform(array)
+
+    # ------------------------------------------------------------------
+    # JSON (de)serialization (pickle-free, used by the Hugging Face Hub integration)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _encoder_to_mapping(enc) -> dict[str, int]:
+        """Return a JSON-friendly ``{str(value): index}`` mapping for any supported encoder."""
+        if isinstance(enc, DictEncoder):
+            return {str(k): int(v) for k, v in enc.mapping.items()}
+        if hasattr(enc, "classes_"):
+            return {str(c): i for i, c in enumerate(enc.classes_)}
+        raise TypeError(f"Unsupported encoder type: {type(enc)}")
+
+    def labels_to_dict(self) -> dict:
+        """Serialize the label encoder(s) (index <-> label) to a JSON-friendly dict.
+
+        Values are stored as strings (``transform`` already casts inputs to ``str``).
+        Encoders are restored as :class:`DictEncoder` objects.
+        """
+        multi_level = isinstance(self.label_encoder, list)
+        encoders = self.label_encoder if multi_level else [self.label_encoder]
+        levels = []
+        for enc in encoders:
+            label2id = self._encoder_to_mapping(enc)
+            levels.append(
+                {
+                    "label2id": label2id,
+                    "id2label": {str(i): lab for lab, i in label2id.items()},
+                }
+            )
+        return {"multi_level": multi_level, "levels": levels}
+
+    def categorical_to_dict(self) -> Optional[dict]:
+        """Serialize categorical encoders to a JSON-friendly dict (``None`` if there are none)."""
+        if self.categorical_encoders is None:
+            return None
+        return {
+            "encoders": {
+                name: self._encoder_to_mapping(enc)
+                for name, enc in self.categorical_encoders.items()
+            }
+        }
+
+    @classmethod
+    def from_dicts(cls, labels: dict, categorical: Optional[dict] = None) -> "ValueEncoder":
+        """Rebuild a ValueEncoder from :meth:`labels_to_dict` / :meth:`categorical_to_dict`."""
+        label_encoders = [DictEncoder(lvl["label2id"]) for lvl in labels["levels"]]
+        label_encoder = label_encoders if labels.get("multi_level") else label_encoders[0]
+        categorical_encoders = None
+        if categorical is not None:
+            categorical_encoders = {
+                name: DictEncoder(mapping) for name, mapping in categorical["encoders"].items()
+            }
+        return cls(label_encoder, categorical_encoders)

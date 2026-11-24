@@ -424,6 +424,7 @@ class NGramTokenizer(BaseTokenizer):
             "preprocess": self.preprocess,
             "vocab_size": self.vocab_size,
             "nwords": self.nwords,
+            "output_dim": self.output_dim,
         }
 
         with open(f"{save_directory}/tokenizer.json", "w") as f:
@@ -457,6 +458,7 @@ class NGramTokenizer(BaseTokenizer):
             num_tokens=config["num_tokens"],
             len_word_ngrams=config["len_word_ngrams"],
             preprocess=config["preprocess"],
+            output_dim=config.get("output_dim"),
             training_text=None,
         )
 
