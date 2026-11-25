@@ -85,7 +85,10 @@ PyTorch Lightning LightningModule for automated training.
 
    - Automated training/validation/test steps
    - Metrics tracking (accuracy)
-   - Optimizer and scheduler management
+   - Optimizer and scheduler management (``ReduceLROnPlateau`` monitors the
+     metric given by ``scheduler_monitor``, default ``"train_loss"``; pass
+     ``scheduler_monitor="val_loss"`` when training with a validation set.
+     ``torchTextClassifiers.train`` sets it automatically.)
    - Logging integration
    - PyTorch Lightning callbacks support
 
