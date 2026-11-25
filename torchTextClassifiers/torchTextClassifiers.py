@@ -446,7 +446,9 @@ class torchTextClassifiers:
         if training_config.scheduler is not None and "ReduceLROnPlateau" in getattr(
             training_config.scheduler, "__name__", ""
         ):
-            # Fall back to the scheduler's own default patience when none is given
+            # No 'patience' in scheduler_params: use the scheduler's own default, read from
+            # its signature (10 for torch.optim.lr_scheduler.ReduceLROnPlateau) rather than
+            # hard-coding it, so we warn on exactly the value PyTorch will use.
             plateau_patience = scheduler_params.get(
                 "patience",
                 inspect.signature(training_config.scheduler).parameters["patience"].default,
