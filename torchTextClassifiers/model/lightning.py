@@ -24,6 +24,7 @@ class TextClassificationModule(pl.LightningModule):
         scheduler,
         scheduler_params,
         scheduler_interval="epoch",
+        scheduler_monitor="train_loss",
         **kwargs,
     ):
         """
@@ -37,6 +38,10 @@ class TextClassificationModule(pl.LightningModule):
             scheduler: Scheduler.
             scheduler_params: Scheduler parameters.
             scheduler_interval: Scheduler interval.
+            scheduler_monitor: Metric monitored by metric-based schedulers such as
+                ``ReduceLROnPlateau``. Use ``"val_loss"`` when a validation set is
+                available (this is what ``torchTextClassifiers.train`` does), so that
+                the scheduler and early stopping watch the same signal.
         """
         super().__init__()
         self.save_hyperparameters(ignore=["model", "loss"])
@@ -68,6 +73,7 @@ class TextClassificationModule(pl.LightningModule):
         self.scheduler = scheduler
         self.scheduler_params = scheduler_params
         self.scheduler_interval = scheduler_interval
+        self.scheduler_monitor = scheduler_monitor
 
     def forward(self, batch) -> torch.Tensor:
         """
@@ -156,14 +162,12 @@ class TextClassificationModule(pl.LightningModule):
         if self.scheduler is None:
             return optimizer
 
-        # Only use scheduler if it's not ReduceLROnPlateau or if we can ensure val_loss is available
-        # For complex training setups, sometimes val_loss is not available every epoch
         if hasattr(self.scheduler, "__name__") and "ReduceLROnPlateau" in self.scheduler.__name__:
-            # For ReduceLROnPlateau, use train_loss as it's always available
+            # ReduceLROnPlateau needs a metric to monitor
             scheduler = self.scheduler(optimizer, **self.scheduler_params)
             scheduler_config = {
                 "scheduler": scheduler,
-                "monitor": "train_loss",
+                "monitor": self.scheduler_monitor,
                 "interval": self.scheduler_interval,
             }
             return [optimizer], [scheduler_config]
