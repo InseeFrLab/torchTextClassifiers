@@ -1,3 +1,4 @@
+import inspect
 import logging
 import pickle
 import time
@@ -437,16 +438,36 @@ class torchTextClassifiers:
                 "⚠️ You have set ragged_multilabel to True but are using CrossEntropyLoss. We would recommend to use torch.nn.BCEWithLogitsLoss for multilabel classification tasks."
             )
 
+        # Early stopping, checkpointing and ReduceLROnPlateau all watch the same metric
+        has_validation = X_val is not None and y_val is not None
+        monitor = "val_loss" if has_validation else "train_loss"
+
+        scheduler_params = training_config.scheduler_params or {}
+        if training_config.scheduler is not None and "ReduceLROnPlateau" in getattr(
+            training_config.scheduler, "__name__", ""
+        ):
+            # Fall back to the scheduler's own default patience when none is given
+            plateau_patience = scheduler_params.get(
+                "patience",
+                inspect.signature(training_config.scheduler).parameters["patience"].default,
+            )
+            if plateau_patience >= training_config.patience_early_stopping:
+                logger.warning(
+                    f"⚠️ ReduceLROnPlateau patience ({plateau_patience}) is not lower than "
+                    f"patience_early_stopping ({training_config.patience_early_stopping}): "
+                    "training will stop before the learning rate is ever reduced. Set a "
+                    "smaller 'patience' in scheduler_params."
+                )
+
         self.lightning_module = TextClassificationModule(
             model=self.pytorch_model,
             loss=training_config.loss,
             optimizer=training_config.optimizer,
             optimizer_params=optimizer_params,
             scheduler=training_config.scheduler,
-            scheduler_params=training_config.scheduler_params
-            if training_config.scheduler_params
-            else {},
+            scheduler_params=scheduler_params,
             scheduler_interval="epoch",
+            scheduler_monitor=monitor,
         )
 
         self.pytorch_model.to(self.device)
@@ -490,13 +511,13 @@ class torchTextClassifiers:
         # Setup trainer
         callbacks = [
             ModelCheckpoint(
-                monitor="val_loss" if val_dataloader is not None else "train_loss",
+                monitor=monitor,
                 save_top_k=1,
                 save_last=False,
                 mode="min",
             ),
             EarlyStopping(
-                monitor="val_loss" if val_dataloader is not None else "train_loss",
+                monitor=monitor,
                 patience=training_config.patience_early_stopping,
                 mode="min",
             ),
