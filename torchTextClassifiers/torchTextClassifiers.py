@@ -88,6 +88,9 @@ class TrainingConfig:
     trainer_params: Optional[dict] = None
     optimizer_params: Optional[dict] = None
     scheduler_params: Optional[dict] = None
+    # Metric watched by ReduceLROnPlateau. None: same as early stopping / checkpointing
+    # ("val_loss" if a validation set is given, else "train_loss").
+    scheduler_monitor: Optional[str] = None
     save_path: Optional[str] = "my_ttc"
 
     def to_dict(self) -> Dict[str, Any]:
@@ -441,6 +444,12 @@ class torchTextClassifiers:
         # Early stopping, checkpointing and ReduceLROnPlateau all watch the same metric
         has_validation = X_val is not None and y_val is not None
         monitor = "val_loss" if has_validation else "train_loss"
+        scheduler_monitor = training_config.scheduler_monitor or monitor
+        if scheduler_monitor.startswith("val_") and not has_validation:
+            raise ValueError(
+                f"scheduler_monitor='{scheduler_monitor}' requires a validation set "
+                "(X_val and y_val)."
+            )
 
         scheduler_params = training_config.scheduler_params or {}
         if training_config.scheduler is not None and "ReduceLROnPlateau" in getattr(
@@ -469,7 +478,7 @@ class torchTextClassifiers:
             scheduler=training_config.scheduler,
             scheduler_params=scheduler_params,
             scheduler_interval="epoch",
-            scheduler_monitor=monitor,
+            scheduler_monitor=scheduler_monitor,
         )
 
         self.pytorch_model.to(self.device)

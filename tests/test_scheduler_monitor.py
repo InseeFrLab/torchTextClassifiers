@@ -107,6 +107,30 @@ class TestTrainSchedulerMonitor:
         )
         assert ttc.lightning_module.scheduler_monitor == "train_loss"
 
+    def test_user_can_keep_train_loss_with_validation_set(
+        self, tmp_path, sample_text_data, sample_labels
+    ):
+        ttc = _classifier(sample_text_data)
+        config = _training_config(tmp_path)
+        config.scheduler_monitor = "train_loss"
+        ttc.train(
+            X_train=sample_text_data,
+            y_train=sample_labels,
+            X_val=sample_text_data,
+            y_val=sample_labels,
+            training_config=config,
+        )
+        assert ttc.lightning_module.scheduler_monitor == "train_loss"
+
+    def test_val_monitor_without_validation_set_raises(
+        self, tmp_path, sample_text_data, sample_labels
+    ):
+        ttc = _classifier(sample_text_data)
+        config = _training_config(tmp_path)
+        config.scheduler_monitor = "val_loss"
+        with pytest.raises(ValueError, match="requires a validation set"):
+            ttc.train(X_train=sample_text_data, y_train=sample_labels, training_config=config)
+
     @pytest.mark.parametrize("scheduler_patience, warns", [(3, True), (2, False)])
     def test_warns_when_scheduler_patience_not_below_early_stopping(
         self, tmp_path, caplog, sample_text_data, sample_labels, scheduler_patience, warns

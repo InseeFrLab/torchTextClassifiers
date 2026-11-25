@@ -117,7 +117,9 @@ Configuration for training process.
    .. attribute:: scheduler
       :type: Optional[Type[torch.optim.lr_scheduler._LRScheduler]]
 
-      Learning rate scheduler class (optional).
+      Learning rate scheduler class (optional). Schedulers are stepped once per
+      epoch. ``ReduceLROnPlateau`` reduces the learning rate when the metric set by
+      :attr:`scheduler_monitor` stops improving.
 
    .. attribute:: accelerator
       :type: str
@@ -134,7 +136,15 @@ Configuration for training process.
    .. attribute:: patience_early_stopping
       :type: int
 
-      Early stopping patience in epochs (default: 3).
+      Early stopping patience in epochs (default: 3). Early stopping and model
+      checkpointing monitor ``"val_loss"`` when a validation set is given,
+      ``"train_loss"`` otherwise.
+
+      With ``ReduceLROnPlateau``, its ``patience`` (in :attr:`scheduler_params`)
+      must be lower than this value, otherwise training stops before the learning
+      rate is ever reduced. A warning is logged in that case. Note that PyTorch's
+      default ``patience`` for ``ReduceLROnPlateau`` is 10, which is higher than
+      the default early stopping patience of 3.
 
    .. attribute:: dataloader_params
       :type: Optional[dict]
@@ -155,6 +165,15 @@ Configuration for training process.
       :type: Optional[dict]
 
       Additional scheduler parameters (optional).
+
+   .. attribute:: scheduler_monitor
+      :type: Optional[str]
+
+      Metric monitored by ``ReduceLROnPlateau`` (ignored by other schedulers).
+      Default (``None``): the same metric as early stopping and checkpointing,
+      i.e. ``"val_loss"`` when a validation set is given, ``"train_loss"`` otherwise.
+      Set to ``"train_loss"`` to reduce the learning rate on the training loss even
+      when a validation set is available.
 
 Example
 ~~~~~~~
@@ -184,6 +203,17 @@ Example
        patience_early_stopping=10,
        optimizer_params={"weight_decay": 0.01},
        scheduler_params={"T_max": 50}
+   )
+
+   # Reduce the learning rate when the validation loss plateaus
+   config = TrainingConfig(
+       num_epochs=50,
+       batch_size=64,
+       lr=1e-3,
+       scheduler=optim.lr_scheduler.ReduceLROnPlateau,
+       scheduler_params={"patience": 2, "factor": 0.5},  # patience < early stopping
+       patience_early_stopping=5,
+       # scheduler_monitor="train_loss",  # uncomment to watch the training loss instead
    )
 
 See Also
