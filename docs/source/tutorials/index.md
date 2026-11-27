@@ -11,6 +11,7 @@ mixed_features
 explainability
 multilabel_classification
 custom_model
+hub_sharing
 ```
 
 ## Overview
@@ -130,6 +131,21 @@ Plug any PyTorch model into the torchTextClassifiers wrapper via `from_model`.
 - Multi-task classification with `MultiLevelTextClassificationModel`
 
 **Difficulty:** Advanced | **Time:** 30 minutes
+:::
+
+
+:::{grid-item-card} {fas}`cloud-arrow-up` Sharing on the Hugging Face Hub
+:link: hub_sharing
+:link-type: doc
+
+Save, load and publish trained classifiers with `save_pretrained`, `from_pretrained` and `push_to_hub`.
+
+**What you'll learn:**
+- Pickle-free serialization (safetensors + JSON)
+- Generating model cards
+- Version compatibility checks
+
+**Difficulty:** Intermediate | **Time:** 10 minutes
 :::
 
 ::::

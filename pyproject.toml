@@ -33,6 +33,8 @@ dev = [
   "pre-commit>=4.3.0",
   "ruff>=0.14.3",
   "ipywidgets>=8.1.8",
+  "huggingface_hub>=0.24",
+  "safetensors",
 ]
 docs = [
   "sphinx>=8.1.0",
@@ -51,6 +53,7 @@ docs = [
 [project.optional-dependencies]
 explainability = ["unidecode", "nltk", "captum"]
 preprocess =     ["unidecode", "nltk"]
+hub = ["huggingface_hub>=0.24", "safetensors"]
 huggingface = [
     "tokenizers>=0.22.1",
     "transformers>=4.57.1",

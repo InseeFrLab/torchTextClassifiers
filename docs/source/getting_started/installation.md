@@ -51,6 +51,21 @@ This installs:
 - `transformers`: HuggingFace transformers
 - `datasets`: HuggingFace datasets
 
+### Hugging Face Hub Sharing
+
+To save, load and share trained models via the Hugging Face Hub (`save_pretrained`, `from_pretrained`, `push_to_hub`):
+
+```bash
+uv sync --extra hub
+# or: pip install "torchTextClassifiers[hub]"
+```
+
+This installs:
+- `huggingface_hub`: Hub client and model card utilities
+- `safetensors`: Pickle-free weight serialization
+
+See {doc}`../tutorials/hub_sharing` for usage.
+
 ### Text Preprocessing
 
 For additional text preprocessing utilities:
